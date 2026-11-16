@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เช็กร่างกาย 5 นาที กับโค้ชฟูจิ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a single-column check-up "chart" — ECG-grid hero, step lanes, results printed like a lab report. */
+:root{
+  --paper:#edf3ef;
+  --card:#ffffff;
+  --ink:#10261c;
+  --muted:#557063;
+  --line:#cfdcd4;
+  --accent:#0e8a5a;
+  --on-accent:#ffffff;
+  --accent-soft:#dcf2e6;
+  --grid:rgba(14,138,90,.11);
+  --good:#2f9e6a; --warn:#c98a10; --bad:#c9342d;
+  --display:"Chakra Petch","IBM Plex Sans Thai",system-ui,sans-serif;
+  --body:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0a1510; --card:#11221a; --ink:#e4f1ea; --muted:#8fb0a0; --line:#20382c;
+    --accent:#3fd18f; --on-accent:#05251a; --accent-soft:#143a2a; --grid:rgba(63,209,143,.09);
+    --good:#3fbf86; --warn:#e5b13a; --bad:#ff6b63; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0a1510; --card:#11221a; --ink:#e4f1ea; --muted:#8fb0a0; --line:#20382c;
+  --accent:#3fd18f; --on-accent:#05251a; --accent-soft:#143a2a; --grid:rgba(63,209,143,.09);
+  --good:#3fbf86; --warn:#e5b13a; --bad:#ff6b63; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:640px;margin:0 auto;padding:16px 16px 64px;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);line-height:1.2;margin:0;text-wrap:balance}
+p{margin:0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Hero: ECG strip */
+.strip{position:relative;border-radius:14px;overflow:hidden;background:var(--card);border:1px solid var(--line);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:16px 16px;padding:22px 20px 20px}
+.strip .tag{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
+.strip h1{font-size:clamp(30px,8vw,44px);font-weight:700;margin-top:6px}
+.strip h1 em{font-style:normal;color:var(--accent)}
+.strip .lead{color:var(--muted);margin-top:8px;max-width:34em}
+.ecg{display:block;width:100%;height:56px;margin:14px 0 4px}
+.ecg path{fill:none;stroke:var(--accent);stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:900;stroke-dashoffset:0;animation:trace 2.6s ease-out 1}
+@keyframes trace{from{stroke-dashoffset:900}to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion: reduce){.ecg path{animation:none}}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+.card h2{font-size:22px;font-weight:700}
+.sub{color:var(--muted);font-size:14px;margin-top:4px}
+
+.btn{appearance:none;border:0;border-radius:10px;padding:14px 18px;font:600 16px var(--body);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
+.btn-primary{background:var(--accent);color:var(--on-accent)}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn-ghost:hover{border-color:var(--ink)}
+.btn:focus-visible,.opt:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row .btn{flex:1 1 140px}
+
+.steps-list{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;margin-top:14px;font-size:15px}
+.steps-list .n{font-family:var(--mono);color:var(--accent);font-weight:600}
+
+/* Sample result */
+.sample{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;margin-top:12px}
+@media (max-width:420px){.sample{grid-template-columns:1fr}.sample svg{max-width:200px;margin:0 auto}}
+.example-badge{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:2px 6px;display:inline-block}
+
+/* Progress lanes */
+.lanes{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.lane{height:6px;border-radius:3px;background:var(--line)}
+.lane.on{background:var(--accent)}
+.lane-label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:6px}
+
+/* Questions */
+.q{display:flex;flex-direction:column;gap:8px;padding:16px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0;padding-top:6px}
+.q label.ql,.q .ql{font-weight:600}
+.q .opt-note{font-weight:400;color:var(--muted);font-size:14px}
+.how{font-size:14px;color:var(--muted);background:var(--paper);border-left:3px solid var(--accent);padding:8px 12px;border-radius:0 8px 8px 0}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.opts.one{grid-template-columns:1fr}
+.opt{appearance:none;text-align:left;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:11px 12px;font:500 15px var(--body);cursor:pointer;min-height:46px;line-height:1.35}
+.opt:hover{border-color:var(--muted)}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.inrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+input[type=number],input[type=text]{font:500 18px var(--mono);width:140px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);min-height:46px}
+input[type=text]{font-family:var(--body);width:100%;max-width:260px}
+.unit{color:var(--muted)}
+.skip{font-size:14px;color:var(--muted);background:none;border:0;text-decoration:underline;cursor:pointer;padding:6px 0;font-family:var(--body)}
+.skipped{font-size:14px;color:var(--muted)}
+.yn{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--line)}
+.yn:last-child{border-bottom:0}
+.yn .pair{display:flex;gap:6px}
+.yn .opt{min-width:64px;text-align:center;padding:8px 10px;min-height:40px}
+.err{color:var(--bad);font-size:14px;font-weight:600}
+.alert{border:1.5px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--card));border-radius:10px;padding:12px 14px;font-size:14px}
+
+.timer{display:flex;align-items:center;gap:10px;flex-wrap:wrap;transition:padding .2s}
+.timer .clock{font:600 26px var(--mono);min-width:72px;font-variant-numeric:tabular-nums}
+.timer .btn{min-height:40px;padding:8px 14px;font-size:14px}
+.timer.running{flex-direction:column;align-items:stretch;gap:12px;padding:16px;border:2px solid var(--accent);border-radius:14px;background:var(--accent-soft)}
+.timer.running .clock{font-size:64px;line-height:1;text-align:center}
+.timer.running .btn{min-height:76px;font-size:22px;background:var(--accent);color:var(--on-accent);border:0}
+.demo{display:flex;justify-content:center;background:var(--paper);border-radius:10px;padding:6px}
+.demo canvas{width:100%;max-width:300px;aspect-ratio:200/140;display:block}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{appearance:none;border:0;background:transparent;color:var(--muted);font:600 15px var(--body);padding:0 14px;min-height:46px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+
+/* Results */
+.report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.score-big{font:700 64px/1 var(--display);color:var(--accent)}
+.score-big small{font-size:20px;color:var(--muted);font-weight:600}
+.level{display:inline-block;font-weight:600;font-size:14px;padding:3px 10px;border-radius:999px;color:#fff;margin-top:6px}
+.pcard{max-width:330px;margin:14px auto 0}
+.igsteps{margin-top:14px;border:1.5px solid var(--line);border-radius:12px;padding:14px;font-size:14px;line-height:1.6}
+.igsteps ol{margin:8px 0 12px 18px;padding:0}
+.igsteps .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.igsteps .row2 .btn{font-size:14px;padding:12px 8px}
+.pcard svg{width:100%;height:auto;display:block}
+@keyframes mpulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes mbeat{0%,100%{transform:scale(1)}15%{transform:scale(1.08)}30%{transform:scale(1)}45%{transform:scale(1.05)}}
+@keyframes mfloat{0%{opacity:0;transform:translateY(4px)}50%{opacity:1}100%{opacity:0;transform:translateY(-8px)}}
+@keyframes mspin{to{transform:rotate(360deg)}}
+@keyframes mtw{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+@keyframes mflame{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.3)}}
+@keyframes mbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.pcard .m-pulse{animation:mpulse 1.2s infinite}
+.pcard .m-beat{transform-box:fill-box;transform-origin:center;animation:mbeat 1.1s infinite}
+.pcard .m-float{animation:mfloat 2s infinite}
+.pcard .m-spin{transform-box:fill-box;transform-origin:center;animation:mspin 3s linear infinite}
+.pcard .m-tw{transform-box:fill-box;transform-origin:center;animation:mtw 1.6s infinite}
+.pcard .m-flame{transform-box:fill-box;transform-origin:top center;animation:mflame .35s infinite}
+.pcard .m-bob{animation:mbob 1.4s ease-in-out infinite}
+@keyframes mpoke{0%,100%{transform:translate(0,0)}50%{transform:translate(3px,-2px)}}
+@keyframes mflapL{0%,100%{transform:rotate(0)}50%{transform:rotate(-14deg)}}
+@keyframes mflapR{0%,100%{transform:rotate(0)}50%{transform:rotate(14deg)}}
+@keyframes mslow{0%,100%{transform:scale(1)}10%{transform:scale(1.12)}20%{transform:scale(1)}}
+.pcard .m-poke{animation:mpoke 1.5s ease-in-out infinite}
+.pcard .m-flapL{transform-box:fill-box;transform-origin:right bottom;animation:mflapL 1s ease-in-out infinite}
+.pcard .m-flapR{transform-box:fill-box;transform-origin:left bottom;animation:mflapR 1s ease-in-out infinite}
+.pcard .m-slowbeat{transform-box:fill-box;transform-origin:center;animation:mslow 2s infinite}
+@media (prefers-reduced-motion:reduce){.pcard *{animation:none!important}}
+.archetype{border:1.5px solid var(--ink);border-radius:12px;padding:16px;margin-top:16px;position:relative}
+.archetype .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.archetype h3{font-size:26px;margin-top:2px}
+.domains{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.dom{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.dom .bar{grid-column:1/-1;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.dom .bar i{display:block;height:100%;border-radius:4px}
+.dom .meta{font-size:13px;color:var(--muted);grid-column:1/-1}
+.pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.radar-box{display:flex;justify-content:center;margin:10px 0}
+.radar-box svg{width:100%;max-width:300px;height:auto}
+.cmps{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.cmp{display:flex;flex-direction:column;gap:6px;padding-bottom:14px;border-bottom:1px dashed var(--line)}
+.cmp:last-child{border-bottom:0;padding-bottom:0}
+.cmp-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.cmp-val .num{font-size:22px;font-weight:600}
+.cmp .meta,.card > .meta{font-size:13px;color:var(--muted)}
+.pbar{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,color-mix(in srgb,var(--bad) 45%,transparent),color-mix(in srgb,var(--warn) 45%,transparent) 40%,color-mix(in srgb,var(--good) 55%,transparent));margin:4px 0}
+.pbar span{position:absolute;top:0;bottom:0;width:1px;background:var(--card)}
+.pbar i{position:absolute;top:-4px;width:6px;height:18px;margin-left:-3px;border-radius:3px;background:var(--ink);box-shadow:0 0 0 2px var(--card)}
+.lb-form{display:flex;flex-direction:column;gap:10px;padding:14px;border:1.5px dashed var(--line);border-radius:12px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
+.check input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.lb-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0 8px}
+.lb-pick{display:flex;gap:6px}
+.lb-sel{font:500 14px var(--body);padding:8px 10px;border-radius:8px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);min-height:40px}
+.lb-me{font-size:16px;margin-bottom:8px;padding:10px 12px;border-radius:10px;background:var(--accent-soft)}
+.lb-me b{font-size:22px;color:var(--accent)}
+.lb-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.lb-list li{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
+.lb-list li.me{border:2px solid var(--accent);background:var(--accent-soft)}
+.lb-list .rk{font-weight:600;font-size:18px;color:var(--muted);text-align:center}
+.lb-list li:nth-child(-n+3) .rk{color:var(--accent)}
+.lb-list .nm{font-weight:600;overflow-wrap:anywhere}
+.lb-list .nm small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.lb-list .sc{font-size:20px;font-weight:600}
+.week{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.day{display:block;padding:0;border:1px solid var(--line);border-radius:10px}
+.day summary{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:start;padding:10px 12px;cursor:pointer;list-style:none}
+.day summary::-webkit-details-marker{display:none}
+.day summary::after{content:"+";font:600 20px var(--mono);color:var(--muted);line-height:1}
+.day[open] summary::after{content:"–"}
+.day summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:10px}
+.day .d{font:700 18px var(--display);color:var(--accent);text-align:center;padding-top:2px}
+.ex{padding:0 12px 12px 68px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+@media (max-width:420px){.ex{padding-left:14px}}
+.ex ol{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.ex li span{display:block;color:var(--ink);font-size:15px}
+.ex li.has-anim{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;cursor:zoom-in}
+.ex li canvas{width:96px;aspect-ratio:200/140;background:var(--paper);border-radius:8px;display:block}
+.ex li.big{grid-template-columns:1fr;cursor:zoom-out}
+.ex li.big canvas{width:100%;max-width:320px}
+.ex li b{display:block;font:600 13px var(--mono);color:var(--accent)}
+.ex-warm,.ex-note{font-size:13px;color:var(--muted)}
+.why,.missions{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);font-size:14px}
+.why ul.clean,.missions ul.clean{margin-top:6px;gap:4px}
+.extra{margin-top:6px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+.extra > b{font-size:13px;color:var(--accent)}
+.ex li small{display:block;font-size:12px;color:var(--muted);line-height:1.55;margin-top:3px}
+.ex li small.exlad{color:var(--ink);opacity:.8}
+.ex li small.exlad i{font-style:normal;color:var(--accent);font-weight:600}
+.day b{display:block}
+.day span{font-size:14px;color:var(--muted)}
+ul.gate{margin:0;padding:12px 14px 12px 30px;background:var(--paper);border-radius:10px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+ul.clean{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.btn-ig{background:linear-gradient(45deg,#feda75 0%,#fa7e1e 25%,#d62976 50%,#962fbf 75%,#4f5bd5 100%);color:#fff;border:0;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.btn-ig:hover{filter:brightness(1.06)}
+.coach .btn-primary{background:var(--accent);color:var(--on-accent)}
+.coach{background:var(--ink);color:var(--paper);border-radius:14px;padding:20px;border:0}
+.coach .sub{color:color-mix(in srgb,var(--paper) 75%,transparent)}
+.coach h2{color:var(--paper)}
+.coach .btn-ghost{color:var(--paper);border-color:color-mix(in srgb,var(--paper) 40%,transparent)}
+.toast{font-size:14px;color:var(--good);font-weight:600;min-height:20px}
+.fine{font-size:12px;color:var(--muted);text-align:center}
+textarea.copybox{width:100%;min-height:140px;font:13px var(--mono);border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:10px;display:none}
+.sound{position:fixed;right:12px;bottom:12px;z-index:5;appearance:none;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font:600 14px var(--body);min-height:40px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.sound[aria-pressed="false"]{color:var(--muted)}
+@media print{.noprint{display:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"><div id="boot" style="padding:40px 8px;text-align:center;font-size:16px;line-height:1.7">กำลังโหลด…</div></main>
+<script>window.__err="";window.onerror=function(m,u,l){if(!window.__err)window.__err=m+" @"+l;};setTimeout(function(){var b=document.getElementById("boot");if(b)b.innerHTML="เปิดหน้านี้ไม่สำเร็จ ลองรีเฟรชอีกครั้ง<br>ถ้ายังไม่ได้ ลองอัปเดตเบราว์เซอร์ หรือสแกน QR ด้วยเครื่องอื่น<br><small style='opacity:.6'>"+String(window.__err).replace(/</g,"&lt;")+"</small>";},6000);</script>
+<button class="sound noprint" id="sound" aria-pressed="true">เสียง: เปิด</button>
+
+<script>
+/* ---------- ตั้งค่าช่องทางติดต่อโค้ช (ใส่ได้ภายหลัง) ---------- */
+const COACH = { name: "โค้ชฟูจิ", line: "fupichaya", ig: "fupichaya" };
+/* ---------- ตารางอันดับ: ใส่ลิงก์ Web app ของ Google Apps Script ---------- */
+const LEADERBOARD_URL = "https://script.google.com/macros/s/AKfycbyfBQHT2PRRuw0yHqSRmsIu3pETXiItUS9IWeo9HXWzUYMvbrptyAG6BiAYLjC9VB1qbA/exec";
+
+/* ---------- คำถาม ---------- */
+const STEPS = [
+ {id:"basic", title:"ข้อมูลพื้นฐาน", sub:"ขอข้อมูลนิดนึง จะได้เทียบกับคนเพศเดียวกันวัยเดียวกันได้ถูก", qs:[
+  {id:"name", type:"text", label:"ชื่อเล่น", ph:"เช่น บีม", optional:true, note:"จะขึ้นในตารางอันดับ ไม่ใส่ก็ได้ ระบบตั้งชื่อให้"},
+  {id:"sex", type:"choice", label:"เพศ", opts:[["m","ชาย"],["f","หญิง"]]},
+  {id:"age", type:"num", label:"อายุ", unit:"ปี", min:12, max:90},
+  {id:"weight", type:"num", label:"น้ำหนัก", unit:"กก.", min:25, max:250},
+  {id:"height", type:"num", label:"ส่วนสูง", unit:"ซม.", min:120, max:220},
+  {id:"waist", type:"num", label:"รอบเอว", unit:"ซม.", optional:true, min:40, max:200, units:{in:{min:16,max:80,label:"นิ้ว"}}, how:"ใช้สายวัดพันรอบเอวระดับสะดือ หายใจออกตามปกติแล้วอ่านค่า"}
+ ]},
+ {id:"goal", title:"เป้าหมาย", sub:"ตอบตามใจเลย ไม่มีผิดไม่มีถูก", qs:[
+  {id:"goal", type:"choice", one:true, label:"อยากได้อะไรจากการออกกำลังกายมากที่สุด", opts:[["fat","ลดไขมัน กระชับสัดส่วน"],["muscle","เพิ่มกล้ามเนื้อ ปั้นหุ่น"],["health","สุขภาพดี มีแรงทำงาน"],["pain","ลดอาการปวด ปรับท่าทาง"],["sport","เล่นกีฬาได้ดีขึ้น เช่น กอล์ฟ วิ่ง แบด"]]},
+  {id:"exp", type:"choice", one:true, label:"ประสบการณ์ออกกำลังกาย", opts:[["0","แทบไม่เคยออกกำลังกาย"],["1","เคยออก แต่หยุดไปนาน"],["2","ออกบ้าง ไม่สม่ำเสมอ"],["3","ออกสม่ำเสมอมา 6 เดือนขึ้นไป"]]},
+  {id:"days", type:"choice", label:"ว่างออกกำลังกายได้กี่วันต่อสัปดาห์", opts:[["2","2 วัน"],["3","3 วัน"],["4","4 วัน"],["5","5 วันขึ้นไป"]]},
+  {id:"mins", type:"choice", label:"ครั้งละประมาณ", opts:[["30","30 นาที"],["45","45 นาที"],["60","60 นาที"],["90","90 นาที"]]}
+ ]},
+ {id:"life", title:"ไลฟ์สไตล์", sub:"นอกยิมสำคัญพอๆ กับในยิม ตอบตามจริงนะ", qs:[
+  {id:"sleep", type:"choice", label:"นอนหลับเฉลี่ยคืนละ", opts:[["a","น้อยกว่า 6 ชม."],["b","6–7 ชม."],["c","7–9 ชม."],["d","มากกว่า 9 ชม."]]},
+  {id:"stress", type:"choice", label:"ความเครียดช่วงนี้", opts:[["1","ชิลมาก"],["2","น้อย"],["3","ปานกลาง"],["4","ค่อนข้างมาก"],["5","เครียดมาก"]]},
+  {id:"sit", type:"choice", label:"นั่งต่อวัน (ทำงาน ขับรถ ดูจอ) รวม", opts:[["a","น้อยกว่า 4 ชม."],["b","4–7 ชม."],["c","8 ชม. ขึ้นไป"]]},
+  {id:"move", type:"choice", one:true, label:"ใน 1 สัปดาห์ ทำกิจกรรมที่เหนื่อยจนหายใจแรงขึ้น (เดินเร็ว ปั่น วิ่ง ว่ายน้ำ) รวมกี่นาที", opts:[["0","แทบไม่มี"],["1","น้อยกว่า 60 นาที"],["2","60–150 นาที"],["3","150 นาทีขึ้นไป"]]},
+  {id:"protein", type:"choice", label:"มื้อหลักมีโปรตีน (ไข่ เนื้อ ปลา เต้าหู้) ไหม", opts:[["a","แทบทุกมื้อ"],["b","บางมื้อ"],["c","น้อยมาก"]]}
+ ]},
+ {id:"safety", title:"เช็กความพร้อมก่อนนิดนึง", sub:"ปลอดภัยไว้ก่อน ดัดแปลงจากแบบคัดกรอง PAR-Q", qs:[
+  {id:"parqAny", type:"choice", label:"มีข้อไหนตรงกับคุณไหม?", list:["หมอเคยบอกว่ามีโรคหัวใจ หรือความดันสูง","เคยเจ็บแน่นหน้าอก หรือหน้ามืดจนเกือบล้ม","มีโรคประจำตัว หรือกินยาประจำ","มีปัญหากระดูกหรือข้อต่อ ที่ออกแรงแล้วแย่ลง","หมอเคยบอกให้ออกกำลังกายภายใต้การดูแลเท่านั้น"], opts:[["n","ไม่มีเลย ลุยได้"],["y","มีอย่างน้อย 1 ข้อ"]]},
+  {id:"pain", type:"multi", label:"มีจุดที่ปวดหรือตึงบ่อยไหม", note:"เลือกได้หลายข้อ", opts:[["none","ไม่มี"],["neck","คอ บ่า"],["shoulder","ไหล่"],["back","หลังส่วนล่าง"],["hip","สะโพก"],["knee","เข่า"],["ankle","ข้อเท้า"],["wrist","ข้อมือ"]]}
+ ]},
+ {id:"test", title:"ถึงเวลาลองของ", sub:"ใช้แค่เก้าอี้ นาฬิกา กับพื้นที่ 2 เมตร ท่าไหนไม่สะดวกกดข้ามได้ ไม่ว่ากัน", qs:[
+  {id:"rhr", type:"num", label:"ชีพจรขณะพัก", unit:"ครั้ง/นาที", skip:true, min:35, max:140,
+   how:"วัดก่อนเริ่มท่าอื่น จะได้ค่าจริงตอนตัวยังไม่เหนื่อย นั่งพักนิ่งๆ แตะชีพจรที่ข้อมือหรือลำคอ นับ 30 วินาทีแล้วคูณ 2 หรือดูค่าจากสมาร์ทวอทช์"},
+  {id:"squat", type:"num", label:"ลุกนั่งเก้าอี้ใน 60 วินาที", unit:"ครั้ง", skip:true, min:0, max:120, timer:"down60", anim:"squat",
+   how:"ใช้เก้าอี้สูงประมาณ 45 ซม. ไม่มีที่วางแขน ไขว้แขนแนบอก ห้ามใช้มือช่วย ย่อลงจนก้นแตะเก้าอี้ แล้วลุกยืนจนเข่าเหยียดสุด นับจำนวนครั้งที่ทำได้ใน 60 วินาที"},
+  {id:"pushStyle", type:"choice", label:"วิดพื้นแบบที่ทำได้", skip:true, opts:[["full","วิดพื้นเต็มตัว"],["knee","วิดพื้นวางเข่า"],["wall","ดันกำแพง"]]},
+  {id:"push", type:"num", label:"วิดพื้นต่อเนื่องได้กี่ครั้ง", unit:"ครั้ง", skip:true, min:0, max:150, anim:"push",
+   how:"ลำตัวตรงตั้งแต่หัวถึงเข่าหรือเท้า ลงจนอกห่างพื้นประมาณหนึ่งกำปั้น นับจนกว่าท่าจะเสีย"},
+  {id:"plank", type:"num", label:"แพลงก์ค้างได้นานกี่วินาที", unit:"วินาที", skip:true, min:0, max:600, timer:"up", anim:"plank",
+   how:"วางศอกใต้ไหล่ ลำตัวตรง ก้นไม่โด่งไม่ตก จับเวลาจนกว่าสะโพกจะตกหรือรู้สึกปวดหลัง"},
+  {id:"toe", type:"choice", one:true, label:"ก้มแตะปลายเท้า (เข่าตรง) มือลงไปถึง", skip:true, opts:[["1","แค่เข่า"],["2","กลางหน้าแข้ง"],["3","ข้อเท้า"],["4","แตะปลายนิ้วเท้า"],["5","ฝ่ามือแตะพื้น"]], anim:"toe",
+   how:"ยืนเท้าชิด ค่อยๆ ก้มตัวลงช้าๆ ห้ามเด้งตัว หายใจออกระหว่างก้ม"},
+  {id:"reach", type:"choice", one:true, label:"เอื้อมมือไขว้หลัง ปลายนิ้วสองมือ", skip:true, opts:[["1","ห่างกันมากกว่า 10 ซม."],["2","ห่างกันเล็กน้อย"],["3","แตะกันพอดี"],["4","ซ้อนกันได้"]], anim:"reach",
+   how:"มือหนึ่งอ้อมจากบนไหล่ลงกลางหลัง อีกมือไขว้จากด้านล่างขึ้นไป พยายามให้ปลายนิ้วเข้าหากัน ลองทั้งสองข้างแล้วตอบข้างที่ทำได้น้อยกว่า"},
+  {id:"march", type:"choice", one:true, label:"ย่ำเท้ายกเข่าสูงอยู่กับที่ 60 วินาที แล้วรู้สึกอย่างไร", skip:true, timer:"down60", anim:"march", opts:[["1","ทำไม่ครบ 1 นาที ต้องหยุดพัก"],["2","หอบจนพูดเป็นประโยคไม่ได้"],["3","เหนื่อย แต่ยังพูดคุยได้"],["4","สบาย หายใจเกือบปกติ"]],
+   how:"ยืนตัวตรง ยกเข่าสลับซ้ายขวาให้สูงประมาณระดับสะโพก แกว่งแขนตาม ทำต่อเนื่องด้วยจังหวะเร็วพอประมาณจนครบเวลา แล้วลองพูดประโยคยาวๆ ดู"}
+ ]}
+];
+
+/* ---------- state ---------- */
+let S = { view:"start", step:0, a:{}, skipped:{}, err:"" };
+function save(){ try{ localStorage.setItem("fuji-check", JSON.stringify(S)); }catch(e){} }
+function load(){ try{ const r = localStorage.getItem("fuji-check"); if(r){ const o = JSON.parse(r); if(o && o.a) S = Object.assign(S, o, {err:""}); } }catch(e){} }
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- scoring ---------- */
+function bandUp(v, t){ let s = 20; t.forEach(x => { if(v >= x) s += 20; }); return s; }
+function bandDown(v, t){ let s = 100; t.forEach(x => { if(v >= x) s -= 20; }); return s; }
+function avg(arr){ const v = arr.filter(x => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((p,c)=>p+c,0)/v.length) : null; }
+function unitOf(id){ return S.a[id+"Unit"] === "in" ? "in" : "cm"; }
+function rng(q){ return q.units && unitOf(q.id) !== "cm" ? Object.assign({}, q, q.units[unitOf(q.id)], {unit:q.units[unitOf(q.id)].label}) : q; }
+function n(k){ const v = S.a[k]; if(v === undefined || v === "" || S.skipped[k]) return null; const x = Number(v); return isNaN(x) ? null : x; }
+function nn(v, d){ return v === undefined || v === null ? d : v; }
+function c(k){ return S.skipped[k] ? null : nn(S.a[k], null); }
+
+/* ---------- เกณฑ์ตามช่วงอายุ ----------
+   ลุกนั่ง 1 นาที: Strassmann et al. 2013, Int J Public Health 58:949-953 (เปอร์เซ็นไทล์ 2.5/25/50/75/97.5)
+   วิดพื้น: CSEP-PATH (ชาย = เต็มตัว, หญิง = วางเข่า) เกณฑ์ขั้นต่ำของ พอใช้/ดี/ดีมาก/ดีเยี่ยม
+   ชีพจรขณะพัก: ตารางอ้างอิงที่ใช้ทั่วไป (ขอบบนของแต่ละระดับ) */
+const STS = {
+  m:[[20,27,41,50,57,72],[25,29,40,48,56,74],[30,28,40,47,56,72],[35,27,38,47,58,72],[40,25,37,45,53,69],[45,25,35,44,52,70],[50,24,35,42,53,67],[55,22,33,41,48,63],[60,20,31,37,46,63],[65,20,29,35,44,60],[70,19,27,32,40,59],[75,16,25,30,37,56]],
+  f:[[20,31,39,47,55,70],[25,30,40,47,54,68],[30,27,37,45,51,68],[35,25,37,42,50,63],[40,26,35,41,48,65],[45,25,35,41,50,63],[50,23,33,39,47,60],[55,21,30,36,43,61],[60,20,28,34,40,55],[65,19,27,33,40,53],[70,17,25,30,36,51],[75,13,22,27,30,43]]
+};
+const PUSHN = {
+  m:[[15,18,23,29,39],[20,17,22,29,36],[30,12,17,22,30],[40,10,13,17,25],[50,7,10,13,21],[60,5,8,11,18]],
+  f:[[15,12,18,25,33],[20,10,15,21,30],[30,8,13,20,27],[40,5,11,15,24],[50,2,7,11,21],[60,2,5,12,17]]
+};
+const PUSH_HI = {15:19,20:29,30:39,40:49,50:59,60:69};
+const PUSH_LV = ["ควรพัฒนา","พอใช้","ดี","ดีมาก","ดีเยี่ยม"];
+const RHRN = {
+  m:[[18,25,55,61,65,69,73,81],[26,35,54,61,65,70,74,81],[36,45,56,62,66,70,75,82],[46,55,57,63,67,71,76,83],[56,65,56,61,67,71,75,81],[66,null,55,61,65,69,73,79]],
+  f:[[18,25,60,65,69,73,78,84],[26,35,59,64,68,72,76,82],[36,45,59,64,69,73,78,84],[46,55,60,65,69,73,77,83],[56,65,59,64,68,73,77,83],[66,null,59,64,68,72,76,84]]
+};
+const RHR_LV = ["ระดับนักกีฬา","ดีเยี่ยม","ดี","ดีกว่าค่าเฉลี่ย","ค่าเฉลี่ย","ต่ำกว่าค่าเฉลี่ย","ควรปรับปรุง"];
+const sexTh = () => S.a.sex === "f" ? "ผู้หญิง" : "ผู้ชาย";
+function pickRow(rows, age){ let r = rows[0]; rows.forEach(x => { if(age >= x[0]) r = x; }); return r; }
+function stsNorm(v, age, sex){
+  const row = pickRow(STS[sex], age), pts = row.slice(1), pc = [2.5,25,50,75,97.5];
+  let pct;
+  if(v <= pts[0]) pct = 2; else if(v >= pts[4]) pct = 98;
+  else { for(let i = 0; i < 4; i++){ if(v <= pts[i+1]){ pct = pc[i] + (pc[i+1]-pc[i]) * (v-pts[i]) / Math.max(1, pts[i+1]-pts[i]); break; } } }
+  pct = Math.round(pct);
+  const lv = pct >= 75 ? "กลุ่มท็อป 25%" : pct >= 50 ? "สูงกว่าค่ากลาง" : pct >= 25 ? "ต่ำกว่าค่ากลาง" : "ต่ำกว่าเกณฑ์";
+  const next = v < pts[1] ? {t:"ให้พ้นกลุ่ม 25% ล่างสุด", n:pts[1]} : v < pts[2] ? {t:"ถึงค่ากลาง", n:pts[2]} : v < pts[3] ? {t:"เข้ากลุ่มท็อป 25%", n:pts[3]} : null;
+  const edge = age < 20 ? " (ใช้เกณฑ์ 20–24 ปี)" : age > 79 ? " (ใช้เกณฑ์ 75–79 ปี)" : "";
+  return {pct, lv, med:pts[2], next, group:`${sexTh()} ${row[0]}–${row[0]+4} ปี${edge}`, score:Math.round(10 + pct*0.9)};
+}
+function pushNorm(v, style, age, sex){
+  // เกณฑ์ CSEP: ชายใช้วิดพื้นเต็มตัว หญิงใช้แบบวางเข่า
+  if(style === "wall" || (sex === "m" && style === "knee")) return null;
+  const row = pickRow(PUSHN[sex], age), th = row.slice(1);
+  let i = 0; th.forEach(x => { if(v >= x) i++; });
+  const next = i < 4 ? {t:`ถึงระดับ “${PUSH_LV[i+1]}”`, n:th[i]} : null;
+  const edge = age < 15 ? " (ใช้เกณฑ์ 15–19 ปี)" : age > 69 ? " (ใช้เกณฑ์ 60–69 ปี)" : "";
+  const note = sex === "f" && style === "full" ? "เทียบกับเกณฑ์วางเข่า แต่คุณทำแบบเต็มตัวซึ่งยากกว่า ระดับจริงน่าจะสูงกว่านี้" : "";
+  return {i, lv:PUSH_LV[i], next, note, group:`${sexTh()} ${row[0]}–${PUSH_HI[row[0]]} ปี${edge}`, score:[20,40,60,80,100][i]};
+}
+function rhrNorm(v, age, sex){
+  const row = pickRow(RHRN[sex], age), ub = row.slice(2);
+  let i = 0; while(i < ub.length && v > ub[i]) i++;
+  const next = i >= 3 ? {t:`ถึงระดับ “${RHR_LV[i-1]}”`, n:ub[i-1], le:true} : null;
+  const edge = age < 18 ? " (ใช้เกณฑ์ 18–25 ปี)" : "";
+  return {i, lv:RHR_LV[i], next, group:`${sexTh()} ${row[1] ? `${row[0]}–${row[1]}` : `${row[0]} ปีขึ้นไป`}${row[1] ? " ปี" : ""}${edge}`, score:[100,90,80,70,55,40,25][i]};
+}
+
+function compute(){
+  const a = S.a, age = n("age") || 30, female = a.sex === "f";
+  // strength
+  const sx = female ? "f" : "m";
+  const sq = n("squat"), sqN = sq != null ? stsNorm(sq, age, sx) : null;
+  let push = null, pushN = null;
+  if(n("push") != null && c("pushStyle")){
+    pushN = pushNorm(n("push"), c("pushStyle"), age, sx);
+    if(pushN) push = pushN.score;
+    else { const mult = {full:1, knee:0.5, wall:0.25}[c("pushStyle")]; push = bandUp(n("push") * mult, female ? [2,6,12,20] : [5,12,20,30]); }
+  }
+  const pl = n("plank");
+  const strength = avg([sqN ? sqN.score : null, push, pl!=null?bandUp(pl,[20,45,75,120]):null]);
+  // cardio
+  const st = c("march"), rhr = n("rhr"), rhrN = rhr != null ? rhrNorm(rhr, age, sx) : null;
+  const cardio = avg([st ? {1:20,2:45,3:70,4:95}[st] : null, rhrN ? rhrN.score : null,
+                      a.move != null && (st || rhr!=null) ? {0:30,1:50,2:75,3:95}[a.move] : null]);
+  // flexibility
+  const flex = avg([c("toe") ? Number(c("toe"))*20 : null, c("reach") ? {1:30,2:55,3:80,4:100}[c("reach")] : null]);
+  // body composition (Asian BMI cut-offs)
+  const w = n("weight"), h = n("height"), wa = n("waist") != null ? n("waist") * (unitOf("waist") === "in" ? 2.54 : 1) : null;
+  let bmi = null, bmiS = null, whr = null, whrS = null;
+  if(w && h){ bmi = w / Math.pow(h/100, 2);
+    bmiS = bmi < 18.5 ? 55 : bmi < 23 ? 95 : bmi < 25 ? 70 : bmi < 30 ? 45 : 25; }
+  if(wa && h){ whr = wa / h; whrS = whr < 0.5 ? 95 : whr < 0.6 ? 55 : 25; }
+  const body = avg([bmiS, whrS]);
+  // lifestyle
+  const life = avg([{a:30,b:65,c:100,d:70}[a.sleep], {1:100,2:85,3:65,4:40,5:20}[a.stress], {a:100,b:65,c:35}[a.sit],
+                    {0:20,1:45,2:75,3:100}[a.move], {a:100,b:60,c:25}[a.protein]]);
+  const dom = [
+    {k:"strength", name:"ความแข็งแรง", s:strength},
+    {k:"cardio", name:"หัวใจและปอด", s:cardio},
+    {k:"flex", name:"ความยืดหยุ่น", s:flex},
+    {k:"body", name:"องค์ประกอบร่างกาย", s:body},
+    {k:"life", name:"ไลฟ์สไตล์", s:life}
+  ];
+  const overall = avg(dom.map(d => d.s));
+  const parqYes = a.parqAny === "y" ? 1 : (a.parq || []).filter(x => x === "y").length;
+  const pain = (a.pain || []).filter(x => x !== "none");
+  return {dom, overall, bmi, whr, parqYes, pain, sqN, pushN, rhrN, sq, rhr};
+}
+
+function levelOf(s){
+  if(s == null) return {t:"ยังไม่มีข้อมูล", col:"var(--muted)"};
+  if(s >= 80) return {t:"ดีมาก", col:"var(--good)"};
+  if(s >= 65) return {t:"ดี", col:"var(--good)"};
+  if(s >= 50) return {t:"พอใช้", col:"var(--warn)"};
+  if(s >= 35) return {t:"ควรพัฒนา", col:"var(--bad)"};
+  return {t:"เริ่มจากตรงนี้", col:"var(--bad)"};
+}
+
+const ARCH = {
+  strength:{t:"ลูกช้างรอโต", d:"ร่างกายยังมีแรงสำรองไม่มาก งานบ้าน ยกของ ขึ้นบันได จะเหนื่อยเร็ว ข่าวดีคือกล้ามเนื้อตอบสนองไวมากในช่วงแรก 6–8 สัปดาห์แรกจะเห็นความต่างชัด",
+            p:["เริ่มเวทพื้นฐาน 5 ท่า: สควอต ฮิปฮินจ์ ดัน ดึง ถือของเดิน","เพิ่มน้ำหนักทีละน้อยทุกสัปดาห์","กินโปรตีนให้ถึงทุกมื้อ"]},
+  cardio:{t:"ปั๊กหอบแฮ่ก", d:"หัวใจและปอดยังทำงานหนักเกินไปเมื่อออกแรง ส่งผลให้เหนื่อยง่ายและฟื้นตัวช้า การเติมคาร์ดิโอเบาๆ อย่างสม่ำเสมอให้ผลเร็วกว่าการอัดหนักนานๆ ครั้ง",
+          p:["เดินเร็วหรือปั่นแบบพูดได้ ครั้งละ 20–30 นาที","สะสมให้ได้ 150 นาทีต่อสัปดาห์","ใช้บันไดแทนลิฟต์เมื่อทำได้"]},
+  flex:{t:"ยีราฟก้มไม่ถึง", d:"กล้ามเนื้อบางมัดตึงจนจำกัดการเคลื่อนไหว ถ้าเพิ่มน้ำหนักทั้งที่ข้อต่อยังขยับได้ไม่สุด ร่างกายจะไปชดเชยที่ข้ออื่น และเป็นต้นเหตุของอาการปวดหลัง ไหล่ เข่า",
+        p:["ยืดเหยียดและโมบิลิตี้ 10 นาทีทุกวัน","เน้นสะโพก หลังต้นขา อก และไหล่","วอร์มอัพด้วยการเคลื่อนไหวก่อนเล่นเวททุกครั้ง"]},
+  body:{t:"หนอนรอเป็นผีเสื้อ", d:"สมรรถภาพพื้นฐานไปได้ แต่สัดส่วนร่างกายยังเป็นจุดที่ควรดูแล เป้าหมายคือลดไขมันโดยเก็บกล้ามเนื้อไว้ ซึ่งต้องทำทั้งเวท อาหาร และการนอนไปพร้อมกัน",
+        p:["เวทเทรนนิ่ง 2–3 วันต่อสัปดาห์ เพื่อรักษากล้าม","ลดแคลอรีแบบพอดี ไม่อดอาหาร","เดินเพิ่มในชีวิตประจำวัน"]},
+  life:{t:"สลอธขยับน้อย", d:"ร่างกายมีพื้นฐาน แต่ชีวิตประจำวันนั่งนาน ขยับน้อย หรือกินโปรตีนยังไม่พอ ร่างกายเลยไม่ได้รับสิ่งที่ต้องใช้ในการพัฒนา ขยับเพิ่มวันละนิด ผลจะเริ่มเห็น",
+        p:["ลุกเดิน 3–5 นาที ทุก 1 ชั่วโมงที่นั่ง","ตั้งเป้าก้าวเดินเพิ่มวันละ 1,000 ก้าวจากเดิม","มีโปรตีนในทุกมื้อหลัก"]},
+  top:{t:"สิงโตเจ้าป่า", d:"พื้นฐานแข็งแรงรอบด้าน ขั้นต่อไปคือการวางโปรแกรมแบบเป็นระบบ เพื่อขยับจากฟิตทั่วไปไปสู่เป้าหมายเฉพาะ เช่น หุ่นที่ชัดขึ้น แรงที่มากขึ้น หรือสมรรถภาพในกีฬา",
+       p:["วางโปรแกรมแบบแบ่งช่วง (periodization)","ติดตามตัวเลขน้ำหนักที่ยกทุกสัปดาห์","ทดสอบซ้ำทุก 8 สัปดาห์"]},
+  tank:{t:"กอริลลาหมดแรง", d:"แรงกล้ามเนื้อดี ยกได้ ดันได้ แต่หัวใจและปอดยังตามไม่ทัน เลยหมดแรงเร็วเวลาต้องออกแรงต่อเนื่อง เติมคาร์ดิโอเข้าไป แรงที่มีจะใช้ได้นานขึ้นมาก",
+        p:["คาร์ดิโอโซน 2 ครั้งละ 30 นาที 2–3 วันต่อสัปดาห์","พักระหว่างเซตให้สั้นลงเล็กน้อย","คงเวทไว้ 2 วัน ไม่ต้องลด"]},
+  rabbit:{t:"กระต่ายวิ่งไม่หยุด", d:"หัวใจและปอดดี เหนื่อยช้า แต่กล้ามเนื้อยังไม่แข็งแรงเท่าที่ควร ซึ่งสำคัญมากเมื่ออายุมากขึ้น ทั้งกระดูก ข้อต่อ และการเผาผลาญ",
+        p:["เวทเทรนนิ่งทั้งตัว 2–3 วันต่อสัปดาห์","เน้นท่าใหญ่: สควอต ก้มยก ดัน ดึง","กินโปรตีนให้ทั่วถึงทุกมื้อ"]},
+  noodle:{t:"ปลาหมึกไร้โครง", d:"ข้อต่อขยับได้กว้างกว่าคนทั่วไป แต่กล้ามเนื้อยังไม่แข็งแรงพอจะคุมช่วงที่กว้างนั้น ควรระวังข้อต่อหลวมหรือเจ็บง่าย การสร้างแรงจะช่วยให้ข้อต่อมั่นคง",
+        p:["เวทแบบคุมจังหวะ ลงช้า 3 วิ","ไม่ต้องยืดเพิ่ม เน้นสร้างแรงในช่วงที่ขยับได้","ฝึกการทรงตัวขาเดียวและแกนกลาง"]},
+  safe:{t:"ด้วงกว่างเกราะแข็ง", d:"แรงเยอะ แข็งแรงดี แต่กล้ามเนื้อตึงจนข้อต่อขยับได้ไม่สุด ถ้าปล่อยไว้ ท่าจะเสียเมื่อยกหนักขึ้น และเสี่ยงบาดเจ็บ",
+        p:["ยืดเหยียดและโมบิลิตี้ 10 นาทีทุกวัน","ฝึกเวทให้ครบช่วงการเคลื่อนไหว ไม่ทำแค่ครึ่งทาง","วอร์มอัพแบบเคลื่อนไหวก่อนยกทุกครั้ง"]},
+  kangaroo:{t:"จิงโจ้แขนสั้น", d:"ขาและสะโพกแข็งแรง แต่ช่วงบนยังตามไม่ทัน ทั้งการดัน ยก และพยุงตัว ช่วงบนที่แข็งแรงช่วยเรื่องท่าทางและไหล่ในระยะยาว",
+        p:["เพิ่มวันเวทช่วงบน ดันและดึงอย่างละ 2 ท่า","ฝึกวิดพื้นบ่อยขึ้น แบบไม่หมดแรงทุกเซต","ทำท่าดึงมากกว่าท่าดันเล็กน้อย"]},
+  turtle:{t:"เต่าคอยื่น", d:"นั่งนานจนไหล่ห่อ คอยื่น และหลังส่วนบนแข็ง เอื้อมมือไขว้หลังไม่ถึงเป็นสัญญาณที่ชัด เจอบ่อยมากในคนทำงานออฟฟิศ และแก้ได้ถ้าเริ่มตอนนี้",
+        p:["ลุกเดิน 3–5 นาที ทุก 1 ชั่วโมงที่นั่ง","ทำท่าดึงและท่าเปิดอกทุกวันที่ฝึก","ยกจอให้อยู่ระดับสายตา"]},
+  owl:{t:"นกฮูกอดนอน", d:"ร่างกายพอมีของ แต่นอนน้อยกว่า 6 ชั่วโมง ทำให้ฟื้นตัวช้า หิวง่าย และกล้ามโตยาก ปรับเรื่องนอนอย่างเดียว ผลการฝึกก็ดีขึ้นชัดเจน",
+        p:["ตั้งเวลาเข้านอนให้ได้ 7 ชม. ขึ้นไป","งดจอ 30–60 นาทีก่อนนอน","เลี่ยงกาแฟหลังบ่ายสอง"]},
+  volcano:{t:"ปักเป้าเครียดพอง", d:"ความเครียดสูงจนร่างกายฟื้นตัวช้า ทั้งการนอนและการกิน การออกกำลังกายช่วยระบายความเครียดได้ดี แต่ต้องไม่หนักจนกลายเป็นภาระเพิ่ม",
+        p:["เดินกลางแจ้งหรือคาร์ดิโอเบาๆ 20–30 นาที","หายใจช้า เข้า 4 วิ ออก 6 วิ วันละ 5 นาที","วันที่เครียดมาก ลดความหนักลงได้ ไม่ต้องรู้สึกผิด"]},
+  core:{t:"จระเข้แกนเหล็ก", d:"แพลงก์ได้ 2 นาทีขึ้นไป แกนกลางแข็งแรงกว่าคนส่วนใหญ่ เป็นฐานที่ดีมากสำหรับยกหนักและกีฬา ขั้นต่อไปคือใช้แกนกลางนี้ส่งแรงในท่าที่ยากขึ้น",
+        p:["เปลี่ยนจากค้างนานเป็นท่าต้านการบิดตัว","เพิ่มท่าถือของเดินข้างเดียว (Suitcase carry)","ใช้แกนกลางกับท่ายกหนัก สควอต ก้มยก"]},
+  cheetah:{t:"หัวใจเสือชีตาห์", d:"ชีพจรขณะพักต่ำกว่า 60 และหัวใจปอดอยู่ในเกณฑ์ดี หัวใจสูบฉีดได้มากต่อครั้ง เป็นลักษณะของคนที่ฝึกความทนทานมาดี",
+        p:["รักษาคาร์ดิโอโซน 2 ไว้ 2–3 วันต่อสัปดาห์","เพิ่มคาร์ดิโอแบบเป็นช่วง 1 วัน เพื่อดันเพดาน","ถ้าชีพจรต่ำแล้วมีอาการเวียนหัว หน้ามืด ควรพบแพทย์"]},
+  legend:{t:"มังกรตำนาน", d:"ทุกด้านได้ 85 ขึ้นไป แข็งแรง ทนทาน ยืดหยุ่น สัดส่วนดี และใช้ชีวิตเอื้อต่อร่างกาย หายากมาก ความท้าทายต่อจากนี้คือรักษาระดับ และตั้งเป้าที่เฉพาะเจาะจงขึ้น",
+        p:["ตั้งเป้าเฉพาะ เช่น สถิติยก วิ่ง หรือกีฬา","วางโปรแกรมแบบแบ่งช่วง และมีสัปดาห์พัก","ทดสอบซ้ำทุก 8 สัปดาห์"]},
+  zero:{t:"ลูกเจี๊ยบเพิ่งฟัก", d:"ทุกด้านยังมีพื้นที่ให้พัฒนา นี่คือจุดเริ่มต้นที่ดีที่สุด เพราะคนที่เริ่มจากตรงนี้จะเห็นการเปลี่ยนแปลงเร็วและชัดที่สุด สิ่งสำคัญคือเริ่มเบาและทำต่อเนื่อง",
+        p:["ออกกำลังกาย 2–3 วันต่อสัปดาห์ ครั้งละ 30 นาทีก่อน","เรียนท่าพื้นฐานให้ถูกตั้งแต่แรก","เน้นทำได้ต่อเนื่อง มากกว่าทำหนัก"]}
+};
+function archetype(r){
+  const known = r.dom.filter(d => d.s != null), sc = {}; r.dom.forEach(d => sc[d.k] = d.s);
+  if(!known.length) return ARCH.zero;
+  if(known.length === 5 && known.every(d => d.s >= 85)) return ARCH.legend;
+  const pl = n("plank");
+  if(pl != null && pl >= 120) return ARCH.core;
+  if(r.rhr && r.rhr >= 40 && r.rhr < 60 && !r.parqYes && sc.cardio != null && sc.cardio >= 70) return ARCH.cheetah;
+  if(known.length >= 4 && known.every(d => d.s >= 75)) return ARCH.top;
+  if(known.length >= 3 && known.every(d => d.s < 45)) return ARCH.zero;
+  // คู่ตรงข้าม: เด่นด้านหนึ่ง แต่อีกด้านห่างกันชัด
+  let best = null;
+  [["tank","strength","cardio",65],["rabbit","cardio","strength",65],["noodle","flex","strength",70],["safe","strength","flex",65]].forEach(([k, hi, lo, min]) => {
+    if(sc[hi] == null || sc[lo] == null) return;
+    const g = sc[hi] - sc[lo];
+    if(sc[hi] >= min && g >= 30 && (!best || g > best.g)) best = {k:k, g:g};
+  });
+  if(r.sqN && r.pushN){ const g = r.sqN.score - r.pushN.score; if(r.sqN.score >= 65 && g >= 35 && (!best || g > best.g)) best = {k:"kangaroo", g:g}; }
+  if(best) return ARCH[best.k];
+  // จุดอ่อนที่สุด แล้วดูพฤติกรรมเฉพาะ
+  const weakest = known.slice().sort((x,y) => x.s - y.s)[0], reach = numC("reach");
+  if((weakest.k === "flex" || weakest.k === "life") && S.a.sit === "c" && reach != null && reach <= 2) return ARCH.turtle;
+  if(weakest.k === "life"){ if(S.a.sleep === "a") return ARCH.owl; if(Number(S.a.stress) >= 4) return ARCH.volcano; }
+  return ARCH[weakest.k];
+}
+
+const SES = {
+  full:["เวทเทรนนิ่งทั้งตัว","สควอต ฮิปฮินจ์ ดัน ดึง"],
+  upper:["เวทช่วงบน","อก หลัง ไหล่ แขน"],
+  lower:["เวทช่วงล่าง + แกนกลาง","ขา ก้น และหน้าท้อง"],
+  z2:["คาร์ดิโอต่อเนื่อง","เดินเร็ว ปั่น หรือวิ่งเบา ระดับที่ยังพูดได้"],
+  hiit:["คาร์ดิโอเป็นช่วง","เร็ว 30 วิ สลับช้า 90 วิ 6–8 รอบ"],
+  mob:["ยืดเหยียดและโมบิลิตี้","สะโพก อก ไหล่ 20–30 นาที"],
+  corr:["คอร์เรกทีฟ + แกนกลาง","ปลุกกล้ามมัดลึก ปรับแนวการเคลื่อนไหว"],
+  power:["พลังและความคล่องตัว","กระโดด เหวี่ยง หมุนตัว ตามชนิดกีฬา"]
+};
+const DAYS = {2:["จ","พฤ"],3:["จ","พ","ศ"],4:["จ","อ","พฤ","ศ"],5:["จ","อ","พ","พฤ","ส"]};
+function plan(r){
+  // จัดตารางจาก "สิ่งที่แต่ละคนยังขาด" ก่อน แล้วค่อยเติมตามเป้าหมาย
+  const d = Number(S.a.days || 3), g = S.a.goal || "health";
+  const T = {
+    fat:["S","z2","S","hiit","mob"],
+    muscle:["S","S","S","S","z2"],
+    health:["S","z2","mob","S","z2"],
+    pain:["corr","z2","corr","mob","S"],
+    sport:["S","power","mob","S","hiit"]
+  };
+  const sc = {}; r.dom.forEach(x => sc[x.k] = x.s);
+  const easy = r.parqYes || S.a.exp === "0";
+  const weak = r.dom.filter(x => x.s != null && x.s < 65).sort((a,b) => a.s - b.s);
+  const flexType = (r.pain.length || g === "pain") ? "corr" : "mob";
+  const why = [];
+  if(r.pain.length) why.push("เลือกท่าเลี่ยงจุดที่ปวดให้แล้ว");
+  if(easy) why.push("ความหนักระดับเบาถึงปานกลาง ไม่มีท่ากระโดดหรือคาร์ดิโอหนัก");
+  const cap = {S: Math.min(easy ? 3 : 4, d), z2:2, hiit:1, mob:1, corr:2, power:1};
+  const cnt = k => list.filter(x => x === k).length;
+  const isWeak = k => sc[k] != null && sc[k] < 65;
+  // ลำดับความสำคัญ: แกนของเป้าหมาย 1 วัน → จุดที่ขาด (หนักสุดก่อน) → วันที่สองของสิ่งที่จำเป็น → ที่เหลือตามเป้าหมาย
+  const primary = {fat:"S", muscle:"S", health:"S", pain:"corr", sport:"S"}[g];
+  const flexDay = d >= 4 || g === "pain" || (weak[0] && weak[0].k === "flex" && !isWeak("strength"));
+  const unit = {strength:"S", cardio:"z2", flex: flexDay ? flexType : null, body:"z2", life:null};
+  const seq = [primary];
+  weak.forEach(w => { if(unit[w.k]) seq.push(unit[w.k]); });
+  if((isWeak("strength") || g === "muscle") && seq.filter(x => x === "S").length < 2) seq.push("S");
+  if(g === "muscle" && d >= 4) seq.push("S");
+  if((isWeak("cardio") || isWeak("body")) && d >= 4) seq.push("z2");
+  let list = [];
+  for(const k of seq.concat(T[g], ["S","z2","mob","S","z2"])){
+    if(list.length >= d) break;
+    if(cnt(k) < cap[k]) list.push(k);
+  }
+  if(!list.includes("S") && d >= 2) list[list.length - 1] = "S";
+  if(easy) list = list.map(x => x === "hiit" ? "z2" : x === "power" ? "mob" : x);
+  // เหตุผลจากตารางที่จัดได้จริง
+  const nS = list.filter(x => x === "S").length, nC = list.filter(x => x === "z2" || x === "hiit").length, flexD = list.find(x => x === "mob" || x === "corr");
+  const why0 = weak.map(w => {
+    if(w.k === "strength") return `ความแข็งแรงได้ ${w.s} คะแนน เลยใส่เวท ${nS} วัน`;
+    if(w.k === "cardio") return nC ? `หัวใจและปอดได้ ${w.s} คะแนน เลยใส่คาร์ดิโอ ${nC} วัน ช่วยให้เหนื่อยช้าลง` : `หัวใจและปอดได้ ${w.s} คะแนน ให้เดินเพิ่มตามภารกิจนอกยิม`;
+    if(w.k === "flex") return `ความยืดหยุ่นได้ ${w.s} คะแนน เลยมีท่ายืดเสริมท้ายวัน${flexD ? ` และวัน${flexD === "corr" ? "คอร์เรกทีฟ" : "ยืดเหยียด"}` : ""}`;
+    if(w.k === "body") return `สัดส่วนร่างกายได้ ${w.s} คะแนน เลยใช้เวท ${nS} วันคู่คาร์ดิโอ ${nC} วัน เพื่อลดไขมันโดยเก็บกล้ามไว้`;
+    if(w.k === "life") return `ไลฟ์สไตล์ได้ ${w.s} คะแนน ดูภารกิจนอกยิมด้านล่าง ส่วนนี้มีผลพอๆ กับการออกกำลังกาย`;
+  });
+  why.unshift(...why0);
+  // เรียงวันให้เวทไม่ติดกัน
+  const strength = list.filter(x => x === "S"), other = list.filter(x => x !== "S"), ordered = [];
+  while(strength.length || other.length){ if(strength.length) ordered.push(strength.shift()); if(other.length) ordered.push(other.shift()); }
+  let up = true;
+  const keys = ordered.map(k => { if(k !== "S") return k; if(g === "muscle" && d >= 4){ const t = up ? "upper" : "lower"; up = !up; return t; } return "full"; });
+  // ท่าเสริมท้ายวัน ตามข้อทดสอบที่ทำได้น้อย
+  const extra = [];
+  const toeV = numC("toe"), reachV = numC("reach"), plV = n("plank");
+  if(toeV != null && toeV <= 2) extra.push(it("ยืดหลังต้นขา (นอนหงายใช้ผ้าคล้องเท้า)","hamstring","ค้าง 30–45 วิ ข้างละ × 2 รอบ",`ก้มแตะเท้าได้แค่${toeV === 1 ? "เข่า" : "กลางหน้าแข้ง"} ยืดหลังวันฝึกตอนกล้ามอุ่นได้ผลดีที่สุด`));
+  if(reachV != null && reachV <= 2) extra.push(it("ยืนพิงกำแพงเลื่อนแขน (Wall slide)","wallslide","10 ครั้ง × 2 รอบ","เอื้อมมือไขว้หลังไม่ถึงกัน ฝึกยกแขนให้สุดโดยหลังไม่แอ่น"));
+  if(plV != null && plV < 45) extra.push(it("เดดบั๊ก (Dead bug)","deadbug","8 ครั้ง ข้างละ × 2 รอบ",`แพลงก์ได้ ${plV} วิ เสริมแกนกลางอีกนิดท้ายวัน`));
+  if(r.pain.includes("neck") || r.pain.includes("shoulder")) extra.push(it("เก็บคางเข้า (Chin tuck)","chintuck","10 ครั้ง ค้าง 3 วิ","ปวดคอบ่าไหล่ ฝึกกล้ามคอส่วนลึกให้รับน้ำหนักหัวแทนบ่า"));
+  return {why, days: keys.map((k,i) => ({day:DAYS[d][i], t:SES[k][0], s:SES[k][1], ex:exercises(k, r), extra: ["full","upper","lower","z2"].includes(k) ? extra.slice(0,2) : []}))};
+}
+function missions(){
+  const a = S.a, m = [];
+  if(a.sleep === "a" || a.sleep === "b") m.push(["นอนให้ได้ 7 ชั่วโมง", "เข้านอนเร็วขึ้นทีละ 15–30 นาที วางมือถือก่อนนอน 30 นาที"]);
+  if(a.sit === "c" || a.sit === "b") m.push(["ลุกเดินทุก 1 ชั่วโมง", "ตั้งเตือนในมือถือ ลุกเดินหรือยืดตัว 3 นาที"]);
+  if(a.protein === "b" || a.protein === "c") m.push(["มีโปรตีนทุกมื้อหลัก", "ไข่ เนื้อ ปลา เต้าหู้ ประมาณ 1 ฝ่ามือต่อมื้อ"]);
+  if(a.stress === "4" || a.stress === "5") m.push(["ลดความเครียดวันละ 10 นาที", "เดินเบาๆ หรือหายใจเข้า 4 วิ ออก 6 วิ ก่อนนอน"]);
+  if(a.move === "0" || a.move === "1") m.push(["เดินเพิ่มในชีวิตประจำวัน", "เริ่มจากเพิ่มวันละ 2,000 ก้าว จากที่เดินอยู่ตอนนี้"]);
+  return m;
+}
+
+/* ---------- เลือกท่ารายบุคคล ----------
+   ทุกท่าเลือกจากผลทดสอบของคนนั้นจริง ได้ระดับที่เหมาะ จำนวนครั้ง เหตุผล
+   และบอกว่าถ้าง่ายไปควรขยับไปท่าไหน ถ้ายากไปควรถอยมาท่าไหน
+   หลักการ: progressive overload, ระดับความหนักตามเป้าหมาย (ACSM/NSCA), เลี่ยงจุดปวด (NASM/NCSF) */
+function it(name, anim, rx, why, up, down){ return {n:name, a:anim, rx:rx, why:why, up:up || null, down:down || null}; }
+function r5(x){ return Math.max(10, Math.round(x / 5) * 5); }
+function numC(k){ const v = c(k); return v == null || v === "" ? null : Number(v); }
+const GOAL_RX = {
+  muscle:{reps:"8–12", tempo:"ลง 3 วิ ขึ้น 1 วิ", rest:"พัก 60–90 วิ", rpe:"เหลือแรงอีก 1–2 ครั้งต่อเซต", why:"ช่วง 8–12 ครั้งที่ใกล้หมดแรงกระตุ้นการสร้างกล้ามได้ดี"},
+  fat:{reps:"12–15", tempo:"จังหวะปกติ คุมท่าตลอด", rest:"พัก 30–45 วิ ทำต่อกันเป็นวงจร", rpe:"เหลือแรงอีก 2–3 ครั้งต่อเซต", why:"พักสั้นแบบวงจรใช้พลังงานมากขึ้น และยังรักษากล้ามไว้ระหว่างลดไขมัน"},
+  health:{reps:"10–12", tempo:"ลง 2 วิ ขึ้น 1 วิ", rest:"พัก 60 วิ", rpe:"เหลือแรงอีก 2–3 ครั้งต่อเซต", why:"ความหนักปานกลางพอสร้างความแข็งแรงโดยไม่ล้าเกินไป"},
+  sport:{reps:"6–10", tempo:"ลงคุม 2 วิ ขึ้นเร็ว", rest:"พัก 90 วิ", rpe:"เหลือแรงอีก 2 ครั้งต่อเซต", why:"ครั้งน้อยลง หนักขึ้น และดันขึ้นเร็ว ช่วยเรื่องแรงและความเร็วที่ใช้ในกีฬา"},
+  pain:{reps:"10–12", tempo:"ช้า ลง 3 วิ ขึ้น 2 วิ เฉพาะช่วงที่ไม่ปวด", rest:"พัก 60 วิ", rpe:"เหลือแรงอีก 3 ครั้ง ไม่ฝืน", why:"จังหวะช้าทำให้คุมท่าได้ และกล้ามรอบข้อต่อทำงานโดยไม่กระแทก"}
+};
+function rxCtx(r){
+  const a = S.a, g = GOAL_RX[a.goal] ? a.goal : "health", exp = Number(a.exp || 1), age = n("age") || 30;
+  const easy = !!r.parqYes || exp === 0;
+  let sets = exp >= 2 ? 3 : 2;
+  if(g === "muscle" && exp >= 3) sets = 4;
+  if(easy) sets = 2;
+  const P = Object.assign({}, GOAL_RX[g]);
+  if(easy) P.rpe = "เหนื่อยระดับ 5–6 จาก 10 ยังพูดได้";
+  const pain = r.pain || [];
+  return {g:g, exp:exp, age:age, easy:easy, sets:sets, P:P, cap: exp === 0 ? 1 : exp === 1 ? 2 : 3, has: p => pain.includes(p)};
+}
+function lvFrom(score, X){
+  const lv = score == null ? Math.min(X.exp, 2) : score < 40 ? 0 : score < 60 ? 1 : score < 80 ? 2 : 3;
+  return Math.min(lv, X.cap);
+}
+function ladder(L, lv, top){ return [L[lv + 1] ? L[lv + 1][0] : top, lv > 0 ? L[lv - 1][0] : null]; }
+
+/* ท่าสควอต: ระดับตามผลลุกนั่งเก้าอี้เทียบคนวัยเดียวกัน */
+function pSquat(r, X){
+  if(X.has("knee")) return it("สควอตลงเก้าอี้ ช่วงสั้นเท่าที่ไม่ปวด", "squat_short", `${X.sets} เซต × 8–10 ครั้ง`,
+    "คุณมีอาการปวดเข่า ย่อแค่ช่วงที่ไม่ปวดเพื่อลดแรงกดที่ลูกสะบ้า แต่ยังได้สร้างกล้ามต้นขาด้านหน้าซึ่งช่วยพยุงเข่า",
+    "ย่อลึกขึ้นทีละนิด เมื่อไม่ปวดติดกัน 2 สัปดาห์", "ยกสะโพก (Glute bridge)");
+  const L = [["สควอตลงนั่งเก้าอี้","squat"],["สควอตตัวเปล่า","squat_free"],["สควอตถือดัมเบลหน้าอก (Goblet squat)","squat_free"],["สควอตถือดัมเบล ลง 3 วิ ค้างล่าง 1 วิ","squat_free"]];
+  const nm = r.sqN, lv = lvFrom(nm ? nm.score : null, X), [up, down] = ladder(L, lv, "เพิ่มน้ำหนักดัมเบลทีละ 1–2 กก.");
+  const res = nm ? `ลุกนั่งเก้าอี้ได้ ${r.sq} ครั้ง (${nm.lv} เมื่อเทียบกับ${nm.group})` : "ไม่ได้ทดสอบลุกนั่ง เลยเริ่มตามประสบการณ์";
+  const aim = lv <= 1 ? "เริ่มระดับนี้เพื่อสร้างแรงขาให้ลุกนั่ง ขึ้นบันได ยกของได้สบาย" : "แรงขาพื้นฐานดีแล้ว เพิ่มน้ำหนักเพื่อกระตุ้นกล้ามต่อ";
+  return it(L[lv][0], L[lv][1], `${X.sets} เซต × ${X.P.reps} ครั้ง`, `${res} ${aim}`, up, down);
+}
+/* ท่าก้มด้วยสะโพก: ดูความตึงหลังต้นขา (ก้มแตะเท้า) และอาการปวดหลัง */
+function pHinge(r, X){
+  const toe = numC("toe"), L = [["ยกสะโพก (Glute bridge)","bridge"],["ยกสะโพกขาเดียว","bridge1"],["ก้มหลังตรงถือดัมเบล (Romanian deadlift)","rdl"],["ก้มหลังตรงถือดัมเบล ขาเดียว","rdl"]];
+  let lv, why;
+  if(X.has("back")){ lv = X.easy ? 0 : Math.min(1, X.cap);
+    why = "คุณมีอาการปวดหลังล่าง ท่านี้สร้างแรงก้นและหลังต้นขาโดยไม่ต้องโน้มตัว จึงไม่เพิ่มแรงที่หลัง ก้นที่แข็งแรงจะรับแรงแทนหลังเวลายกของ"; }
+  else if(toe != null && toe <= 2){ lv = X.easy ? 0 : Math.min(1, X.cap);
+    why = `ก้มแตะเท้าได้แค่${toe === 1 ? "เข่า" : "กลางหน้าแข้ง"} หลังต้นขายังตึง ถ้าก้มยกน้ำหนักตอนนี้ หลังจะงอแทนสะโพก เลยสร้างแรงก้นด้วยท่านี้ก่อน ควบคู่กับท่ายืดหลังต้นขา`; }
+  else { lv = lvFrom(r.dom[0].s, X);
+    why = lv >= 2 ? `${toe ? "ก้มแตะเท้าได้ดีพอ " : ""}ฝึกก้มด้วยสะโพกแบบหลังตรง ซึ่งเป็นท่าเดียวกับการยกของจากพื้นในชีวิตจริง`
+                  : "ปลุกกล้ามก้นที่มักไม่ค่อยทำงานในคนที่นั่งนาน ก่อนขยับไปท่าก้มยกน้ำหนัก"; }
+  const [up, down] = ladder(L, lv, "เพิ่มน้ำหนักทีละ 2 กก.");
+  const upTxt = X.has("back") && lv <= 1 ? `${up} เมื่อไม่ปวดหลังติดกัน 2 สัปดาห์` : lv === 1 && toe != null && toe <= 2 ? "ก้มหลังตรงถือดัมเบล เมื่อก้มแตะข้อเท้าได้" : up;
+  return it(L[lv][0], L[lv][1], `${X.sets} เซต × ${lv === 1 || lv === 3 ? X.P.reps + " ครั้ง ข้างละ" : X.P.reps + " ครั้ง"}`, why, upTxt, down);
+}
+/* ท่าดัน: ระดับและจำนวนครั้งจากผลวิดพื้นจริง */
+function pPush(r, X){
+  const st = c("pushStyle"), cnt = n("push");
+  const aim = "ฝึกแรงดันของอก ไหล่ หลังแขน และแกนกลางไปพร้อมกัน";
+  if(X.has("shoulder")){
+    const strong = (st === "full" && cnt >= 10) || (st === "knee" && cnt >= 20);
+    const nm = strong ? "วิดพื้นมือวางบนโต๊ะ ลงเท่าที่ไม่ปวด" : "ดันกำแพง";
+    return it(nm, "push_wall", `${X.sets} เซต × 10–12 ครั้ง`,
+      `คุณมีอาการปวดไหล่${strong ? ` แม้แรงดันจะดี (ทดสอบได้ ${cnt} ครั้ง)` : ""} ให้ลดน้ำหนักที่ไหล่ด้วยการวางมือสูงขึ้น ศอกห่างลำตัวราว 45 องศา ไม่กางศอกออกข้าง และไม่ลงลึกจนไหล่ปวด`,
+      strong ? "วิดพื้นเต็มตัว เมื่อไม่ปวดติดกัน 2 สัปดาห์" : "วิดพื้นวางเข่า เมื่อไม่ปวดติดกัน 2 สัปดาห์", strong ? "ดันกำแพง" : null); }
+  const L = [["ดันกำแพง","push_wall"],["วิดพื้นวางเข่า","push_knee"],["วิดพื้นเต็มตัว","push_full"],["วิดพื้นเต็มตัว ลง 3 วิ","push_full"]];
+  let lv, res, reps = X.P.reps;
+  if(st && cnt != null){
+    lv = st === "wall" ? (cnt >= 20 ? 1 : 0) : st === "knee" ? (cnt >= 15 ? 2 : 1) : (cnt >= 20 ? 3 : 2);
+    lv = Math.min(lv, X.cap);
+    res = `ทดสอบ${st === "wall" ? "ดันกำแพง" : st === "knee" ? "วิดพื้นวางเข่า" : "วิดพื้นเต็มตัว"}ได้ ${cnt} ครั้ง`;
+    const same = (st === "wall" && lv === 0) || (st === "knee" && lv === 1) || (st === "full" && lv >= 2);
+    if(same){ const k = Math.max(5, Math.min(15, Math.round(cnt * 0.6))); reps = String(k);
+      res += ` ตั้งไว้เซตละ ${k} ครั้ง (ราว 60% ของที่ทำได้) ให้ท่าสวยทุกครั้ง`; }
+    else if(st === "knee" && lv === 2) res += " แข็งแรงพอขยับเป็นเต็มตัวแล้ว ถ้าได้ไม่ถึง 5 ครั้ง ให้ลงช้า 3 วิ แล้ววางเข่าดันขึ้น";
+    else if(st === "wall" && lv === 1) res += " ดันกำแพงสบายแล้ว ขยับมาวางเข่าบนพื้น";
+  } else { lv = Math.min(X.exp, 2, X.cap); res = "ไม่ได้ทดสอบวิดพื้น เลยเริ่มตามประสบการณ์"; }
+  const wrist = X.has("wrist") ? " ข้อมือปวด ให้กำมือหรือจับดัมเบลแทนการวางฝ่ามือ ข้อมือจะได้ตรง" : "";
+  const [up, down] = ladder(L, lv, "ยกเท้าวางบนเก้าอี้");
+  return it(L[lv][0], L[lv][1], `${X.sets} เซต × ${reps} ครั้ง`, `${res} ${aim}${wrist}`, up, down);
+}
+/* ท่าดึง: สำคัญขึ้นถ้าไหล่ห่อ (เอื้อมไขว้หลังไม่ถึง นั่งนาน ปวดคอบ่า) */
+function postureFlags(X){
+  const reach = numC("reach"), f = [];
+  if(reach != null && reach <= 2) f.push("เอื้อมมือไขว้หลังไม่ถึงกัน");
+  if(S.a.sit === "c") f.push("นั่งวันละ 8 ชม. ขึ้นไป");
+  if(X.has("neck") || X.has("shoulder")) f.push("ปวดคอบ่าหรือไหล่");
+  return f;
+}
+function pPull(r, X){
+  const f = postureFlags(X), name = X.exp === 0 ? "ดึงยางยืด (นั่งดึงเข้าหาตัว)" : "ดัมเบลโรว์ข้างเดียว";
+  const why = f.length ? `คุณ${f.join(" และ")} มักมาคู่กับไหล่ห่อ ท่าดึงสร้างกล้ามหลังส่วนบนที่ดึงสะบักกลับ จึงทำจำนวนครั้งมากกว่าท่าดัน`
+                       : "ท่าดึงสร้างหลังและสะบัก ให้สมดุลกับท่าดัน ป้องกันไหล่ห่อในระยะยาว";
+  return it(name, "row", `${X.sets} เซต × ${f.length ? "12–15" : X.P.reps} ครั้ง${X.exp === 0 ? "" : " ข้างละ"}`, why,
+    X.exp === 0 ? "ดัมเบลโรว์ข้างเดียว" : "เพิ่มน้ำหนัก หรือค้างบนสุด 2 วิ", X.exp === 0 ? null : "ดึงยางยืด (นั่งดึงเข้าหาตัว)");
+}
+/* ท่าแกนกลาง: ระดับจากเวลาแพลงก์จริง */
+function pCore(r, X){
+  const pl = n("plank");
+  if(X.has("back")) return it("เบิร์ดด็อก (Bird dog)", "birddog", `${X.sets} เซต × 6–8 ครั้ง ข้างละ ค้าง 5 วิ`,
+    "คุณมีอาการปวดหลังล่าง ท่านี้ฝึกให้หลังนิ่งขณะแขนขาขยับ เป็นหนึ่งในท่าหลักตามแนวทางของ Stuart McGill สำหรับคนปวดหลัง",
+    "แพลงก์ด้านข้าง (วางเข่า)", "เดดบั๊ก (Dead bug)");
+  if(X.has("shoulder") || X.has("wrist")) return it("เดดบั๊ก (Dead bug)", "deadbug", `${X.sets} เซต × 8 ครั้ง ข้างละ`,
+    "ฝึกแกนกลางท่านอนหงาย ไม่ต้องลงน้ำหนักที่ไหล่และข้อมือที่ปวด", "เดดบั๊กเหยียดขาไกลขึ้น", null);
+  if(pl == null) return it("แพลงก์", "plank", `${X.sets} เซต × ค้าง ${X.exp >= 2 ? 30 : 20} วิ`, "ไม่ได้ทดสอบแพลงก์ เลยเริ่มตามประสบการณ์ ฝึกให้ลำตัวตรงนิ่ง", "เพิ่มทีละ 5–10 วิ", "เดดบั๊ก (Dead bug)");
+  if(pl < 20) return it("เดดบั๊ก (Dead bug)", "deadbug", `${X.sets} เซต × 8 ครั้ง ข้างละ`,
+    `แพลงก์ได้ ${pl} วิ ยังคุมแกนกลางในท่าคว่ำได้ไม่นาน เริ่มจากท่านอนหงายซึ่งหลังปลอดภัยกว่า`, "แพลงก์ ค้าง 15–20 วิ", null);
+  if(pl < 45){ const h = r5(pl * 0.6); return it("แพลงก์", "plank", `${X.sets} เซต × ค้าง ${h} วิ`,
+    `แพลงก์ได้ ${pl} วิ ตั้งไว้เซตละ ${h} วิ (ราว 60%) ให้ลำตัวตรงตลอด เป้าหมายคือ 45 วิ ซึ่งถือว่าแกนกลางพื้นฐานดี`, "เพิ่มทีละ 5 วิ จนถึง 45 วิ", "เดดบั๊ก (Dead bug)"); }
+  if(pl < 90) return it("แพลงก์ด้านข้าง", "sideplank", `${X.sets} เซต × ค้าง ${r5(pl * 0.4)} วิ ข้างละ`,
+    `แพลงก์ได้ ${pl} วิ แกนกลางด้านหน้าดีแล้ว เพิ่มด้านข้างซึ่งช่วยกันลำตัวเอียงและเข่าบิดเวลาลงน้ำหนักขาเดียว`, "แพลงก์แตะไหล่สลับ", "แพลงก์ด้านข้าง (วางเข่า)");
+  return it("แพลงก์แตะไหล่สลับ", "plank_tap", `${X.sets} เซต × 10 ครั้ง ข้างละ`,
+    `แพลงก์ได้ ${pl} วิ ค้างนานกว่านี้แทบไม่ได้ประโยชน์เพิ่ม เปลี่ยนเป็นท่าต้านการบิดตัวซึ่งยากกว่าและใช้กับชีวิตจริงได้มากกว่า`, "แตะไหล่ช้าลง 2 วิต่อครั้ง", "แพลงก์ด้านข้าง");
+}
+/* ท่าขาเดียว: ทรงตัว เก็บข้างที่อ่อนกว่า */
+function pSingle(r, X){
+  if(X.has("knee") || X.has("ankle")) return it("ยกสะโพกขาเดียว", "bridge1", `${X.sets} เซต × 10–12 ครั้ง ข้างละ`,
+    `ฝึกขาทีละข้างโดยไม่ลงน้ำหนักที่${X.has("knee") ? "เข่า" : "ข้อเท้า"}ที่ปวด`, "ก้าวขึ้นลงขั้นบันได (ขั้นต่ำ) เมื่อไม่ปวด", "ยกสะโพก (Glute bridge)");
+  const L = [["ก้าวขึ้นลงขั้นบันได (ขั้นต่ำ)","stepup"],["ก้าวขึ้นลงขั้นบันได","stepup"],["ก้าวถอยหลังย่อเข่า (Reverse lunge)","lunge"],["ก้าวถอยหลังย่อเข่า ถือดัมเบล","lunge"]];
+  const lv = lvFrom(r.sqN ? r.sqN.score : r.dom[0].s, X), [up, down] = ladder(L, lv, "เพิ่มน้ำหนักดัมเบล");
+  const why = X.age >= 60 ? "ในวัยนี้การฝึกขาทีละข้างช่วยเรื่องการทรงตัวและลดความเสี่ยงล้ม ตามคำแนะนำของ ACSM"
+            : X.g === "sport" ? "กีฬาเกือบทุกชนิดลงน้ำหนักทีละขา ท่านี้ฝึกแรงและการทรงตัวแบบที่ใช้จริง"
+            : "ขาสองข้างมักแรงไม่เท่ากัน ฝึกทีละข้างช่วยเก็บข้างที่อ่อนกว่า และใช้จริงตอนขึ้นบันได";
+  return it(L[lv][0], L[lv][1], `${X.sets} เซต × ${X.P.reps} ครั้ง ข้างละ`, why, up, down);
+}
+/* ท่าดันเหนือหัว: ทำเมื่อยกแขนได้สุดเท่านั้น */
+function pOver(r, X){
+  const reach = numC("reach");
+  if(X.has("shoulder") || X.has("neck") || (reach != null && reach <= 2)){
+    const f = [reach != null && reach <= 2 ? "เอื้อมมือไขว้หลังไม่ถึงกัน" : null, X.has("shoulder") || X.has("neck") ? "ปวดคอบ่าไหล่" : null].filter(Boolean).join(" และ");
+    return it("ยืนพิงกำแพงเลื่อนแขน (Wall slide)", "wallslide", `${X.sets} เซต × 10–12 ครั้ง`,
+      `คุณ${f} แปลว่ายังยกแขนเหนือหัวได้ไม่สุด ถ้าดันน้ำหนักเหนือหัวตอนนี้ หลังจะแอ่นชดเชยและไหล่ถูกบีบ ฝึกให้ยกแขนได้สุดก่อน`,
+      "ดันดัมเบลเหนือหัว เมื่อไขว้มือหลังแตะกันได้", null);
+  }
+  return it("ดันขวดน้ำหรือดัมเบลขึ้นเหนือหัว", "press", `${X.sets} เซต × ${X.P.reps} ครั้ง`,
+    `${reach ? "ไหล่ยกได้สุดดี " : ""}ฝึกดันเหนือหัวขณะยืน สร้างไหล่และแกนกลางไปพร้อมกัน`, "เพิ่มน้ำหนักทีละ 1 กก.", "ยืนพิงกำแพงเลื่อนแขน (Wall slide)");
+}
+function pPullApart(r, X){
+  const f = postureFlags(X);
+  return it("กางแขนดึงยางยืด (Band pull-apart)", "pullapart", `${X.sets} เซต × 15 ครั้ง`,
+    f.length ? `คุณ${f.join(" และ")} ท่านี้ฝึกกล้ามหลังไหล่และสะบักที่ช่วยดึงไหล่กลับ` : "ฝึกกล้ามหลังไหล่ให้สมดุลกับอกและไหล่หน้า",
+    "ค้างตอนกางสุด 2 วิ", null);
+}
+function pCurl(r, X){
+  return it("งอแขนยกดัมเบล (Biceps curl)", "curl", `${X.sets} เซต × ${X.P.reps} ครั้ง`, "เป้าหมายคือเพิ่มกล้าม เสริมต้นแขนหลังจากท่าหลักแล้ว", "ลงช้า 3 วิ", null);
+}
+function pCalf(r, X){
+  return it("ยืนเขย่งปลายเท้า", "calf", `${X.sets} เซต × 15–20 ครั้ง`, "น่องที่แข็งแรงช่วยให้ข้อเท้ามั่นคงเวลาเดิน วิ่ง และขึ้นบันได", "เขย่งขาเดียว", null);
+}
+
+/* วันเวท: เลือกท่าตามลำดับความสำคัญของคนนั้น แล้วเรียงท่าใหญ่ก่อน */
+function strengthDay(k, r){
+  const X = rxCtx(r), mins = Number(S.a.mins || 45), N = mins <= 30 ? 4 : mins <= 45 ? 5 : 6;
+  const pl = n("plank"), posture = postureFlags(X).length > 0, coreNeed = (pl != null && pl < 45) || X.has("back");
+  let slots;
+  if(k === "upper") slots = [[pPush,5],[pPull,posture ? 5.1 : 4.9],[pOver,4],[pPullApart,posture ? 4.5 : 2],[pCore,coreNeed ? 4.2 : 2.5],[pCurl,X.g === "muscle" ? 3 : 0]];
+  else if(k === "lower") slots = [[pSquat,5],[pHinge,4.9],[pSingle,4.5],[pCore,coreNeed ? 4.2 : 3],[pCalf,X.has("ankle") ? 0 : 1.5]];
+  else slots = [[pSquat,5],[pPush,4.8],[pHinge,4.6],[pPull,posture ? 4.9 : 4.7],[pSingle,X.age >= 60 || X.g === "sport" ? 4.5 : 3],[pCore,coreNeed ? 4.55 : 3.5]];
+  const keep = slots.filter(s => s[1] > 0).sort((a,b) => b[1] - a[1]).slice(0, N).map(s => s[0]);
+  const seen = new Set(), list = [];
+  slots.forEach(s => { if(!keep.includes(s[0])) return; const e = s[0](r, X); if(seen.has(e.n)) return; seen.add(e.n); list.push(e); });
+  const warm = ["หมุนข้อต่อ","เดินย่ำเท้า 1 นาที", X.has("knee") ? "ยกสะโพก 10 ครั้ง" : "สควอตตัวเปล่า 10 ครั้ง"];
+  if(numC("toe") != null && numC("toe") <= 2) warm.push("เหวี่ยงขาหน้าหลัง");
+  if(posture) warm.push("หมุนแขนวงใหญ่");
+  const note = `จังหวะ: ${X.P.tempo} · ${X.P.rest} · ความหนัก: ${X.P.rpe} (${X.P.why})` +
+    (X.g === "fat" ? " · ทำท่าแรกถึงท่าสุดท้ายต่อกันเป็น 1 รอบ แล้ววนใหม่" : "") +
+    " · ทำครบทุกเซตได้สบาย 2 ครั้งติดกัน ค่อยขยับท่าหรือเพิ่มน้ำหนัก";
+  return {warm:"วอร์มอัพ 5 นาที: " + warm.join(" "), list, note};
+}
+
+/* วันยืด/คอร์เรกทีฟ: เลือกจากจุดตึง จุดปวด และพฤติกรรมของคนนั้น */
+function flexDay(k, r){
+  const X = rxCtx(r), toe = numC("toe"), reach = numC("reach"), sit = S.a.sit, pl = n("plank");
+  const mins = Number(S.a.mins || 45), N = mins <= 30 ? 5 : 6, sitTxt = sit === "c" ? "นั่งวันละ 8 ชม. ขึ้นไป" : "นั่งวันละ 4–7 ชม.";
+  const C = [
+    {e:it("ยืดหลังต้นขา (นอนหงายใช้ผ้าคล้องเท้า)","hamstring","ค้าง 30–45 วิ ข้างละ",`ก้มแตะเท้าได้แค่${toe === 1 ? "เข่า" : "กลางหน้าแข้ง"} หลังต้นขาตึงจะดึงเชิงกรานจนหลังงอเวลาก้ม`,null), on: toe != null && toe <= 2, t:"m"},
+    {e: X.has("knee") ? it("ยืนยืดสะโพกหน้า มือจับผนัง","quadstretch","ค้าง 30–45 วิ ข้างละ","") : it("ยืดสะโพกหน้า (คุกเข่าข้างเดียว)","hipflexor","ค้าง 30–45 วิ ข้างละ",""),
+     on: sit === "b" || sit === "c" || X.has("back"), t:"m", w: X.has("back") ? "สะโพกด้านหน้าที่ตึงดึงหลังล่างให้แอ่น เพิ่มแรงที่หลังส่วนที่ปวด" : `${sitTxt} สะโพกด้านหน้าจะหดสั้นและดึงหลังล่างให้แอ่น`},
+    {e:it("หมุนตัวช่วงอก (นอนตะแคง)","openbook","8 ครั้ง ข้างละ",""), on: (reach != null && reach <= 2) || X.has("neck") || X.has("shoulder"), t:"m", w:"หลังส่วนบนที่แข็งทำให้ไหล่และคอต้องขยับแทน ท่านี้คืนการบิดตัวช่วงอก"},
+    {e: X.has("shoulder") ? it("ยืดอกแขนต่ำ เท่าที่ไม่ปวด","doorway","ค้าง 30 วิ","") : it("ยืดอกที่ขอบประตู","doorway","ค้าง 30–45 วิ",""), on: (reach != null && reach <= 2) || sit === "c", t:"m", w:"อกด้านหน้าที่ตึงจากการนั่งหน้าจอดึงไหล่ให้ห่อ"},
+    {e:it("ยืนพิงกำแพงเลื่อนแขน (Wall slide)","wallslide","10 ครั้ง",""), on: (reach != null && reach <= 2) || X.has("shoulder"), t:"c", w:`${reach != null && reach <= 2 ? "เอื้อมมือไขว้หลังไม่ถึงกัน " : ""}ฝึกยกแขนให้สุดโดยหลังไม่แอ่น และปลุกกล้ามสะบักส่วนล่าง`},
+    {e:it("เก็บคางเข้า (Chin tuck)","chintuck","10 ครั้ง ค้าง 3 วิ",""), on: X.has("neck") || sit === "c", t:"c", w: X.has("neck") ? "คุณปวดคอบ่า ท่านี้ฝึกกล้ามคอส่วนลึก ลดภาระของบ่าที่ต้องเกร็งพยุงหัว" : "นั่งหน้าจอนานหัวมักยื่นไปข้างหน้า เพิ่มแรงที่คอบ่า"},
+    {e:it("แมว-วัว (Cat-cow)","catcow","10 ครั้ง ช้าๆ",""), on: X.has("back") || sit === "c", t:"m", w:"ขยับกระดูกสันหลังทีละข้อ คลายความตึงจากการนั่งหรือยืนนิ่งนาน"},
+    {e:it("เดดบั๊ก (Dead bug)","deadbug","8 ครั้ง ข้างละ",""), on: X.has("back") || (pl != null && pl < 45), t:"c", w: pl != null && pl < 45 ? `แพลงก์ได้ ${pl} วิ ฝึกแกนกลางให้คุมหลังนิ่งขณะแขนขาขยับ` : "ฝึกคุมหลังให้นิ่ง ลดภาระของหลังล่าง"},
+    {e: X.has("wrist") ? it("นอนตะแคงยกขาด้านบน","sidelegraise","12–15 ครั้ง ข้างละ","") : it("เบิร์ดด็อก (Bird dog)","birddog","8 ครั้ง ข้างละ ค้าง 5 วิ",""), on: X.has("back"), t:"c", w:"ท่าหลักของแนวทาง McGill สำหรับคนปวดหลัง ฝึกหลังให้นิ่งขณะแขนขาขยับ"},
+    {e:it("แพลงก์ด้านข้าง (วางเข่า)","sideplank","15–25 วิ ข้างละ",""), on: X.has("back") && !X.has("shoulder"), t:"c", w:"สร้างความทนทานของกล้ามข้างลำตัว ช่วยพยุงหลังล่าง"},
+    {e:it("นอนตะแคงยกขาด้านบน","sidelegraise","12–15 ครั้ง ข้างละ",""), on: X.has("knee") || X.has("hip"), t:"c", w:"ก้นด้านข้างที่อ่อนทำให้เข่าบิดเข้าเวลาลงน้ำหนัก เป็นสาเหตุที่พบบ่อยของอาการปวดเข่าและสะโพก"},
+    {e:it("ยกสะโพก (Glute bridge)","bridge","12–15 ครั้ง",""), on: X.has("back") || X.has("knee"), t:"c", w:"ปลุกกล้ามก้นให้รับแรงแทนหลังและเข่า"},
+    {e: X.has("knee") ? it("นอนหงายไขว้ขายืดก้น","figure4","ค้าง 30–45 วิ ข้างละ","") : it("นั่งท่า 90/90 สลับสะโพก","hip9090","8 ครั้ง ข้างละ",""), on: X.has("hip") || X.has("back"), t:"m", w:"สะโพกที่หมุนได้น้อยทำให้หลังล่างและเข่าต้องบิดแทน"}
+  ];
+  C.forEach(x => { if(x.w) x.e.why = x.w; });
+  const pref = k === "corr" ? ["c","m"] : ["m","c"];
+  const seen = new Set(), list = [];
+  const add = e => { if(list.length >= N || seen.has(e.n)) return; seen.add(e.n); list.push(e); };
+  pref.forEach(t => C.filter(x => x.on && x.t === t).forEach(x => add(x.e)));
+  const fill = k === "corr" ? ["เดดบั๊ก (Dead bug)","เบิร์ดด็อก (Bird dog)","ยกสะโพก (Glute bridge)","ยืนพิงกำแพงเลื่อนแขน (Wall slide)","แมว-วัว (Cat-cow)","หมุนตัวช่วงอก (นอนตะแคง)"]
+                            : ["แมว-วัว (Cat-cow)","หมุนตัวช่วงอก (นอนตะแคง)","ยืดสะโพกหน้า (คุกเข่าข้างเดียว)","ยืดหลังต้นขา (นอนหงายใช้ผ้าคล้องเท้า)","นั่งท่า 90/90 สลับสะโพก","ยืดอกที่ขอบประตู"];
+  fill.forEach(nm => { const x = C.find(y => y.e.n === nm); if(x && !seen.has(nm)){ const e = Object.assign({}, x.e, {why:"ดูแลการเคลื่อนไหวพื้นฐานของข้อต่อนี้ ผลทดสอบส่วนนี้ของคุณยังดีอยู่"}); add(e); } });
+  list.forEach(e => { e.rx += " × 2 รอบ"; });
+  const note = k === "corr" ? "ทำช้าๆ เน้นรู้สึกกล้ามที่ทำงาน ไม่ปวดเพิ่มระหว่างทำ ถ้าปวดเพิ่มให้หยุดท่านั้น"
+                            : "ยืดค้างแบบผ่อนคลาย หายใจยาว ตึงได้แต่ไม่เจ็บ ไม่เด้งตัว";
+  return {warm:"", list, note};
+}
+
+/* วันคาร์ดิโอ: โซนชีพจรคำนวณจากอายุและชีพจรขณะพักของคนนั้น */
+function cardioDay(k, r){
+  const X = rxCtx(r), mins = Number(S.a.mins || 45), cs = r.dom[1].s, rhr = r.rhr, hrMax = Math.round(208 - 0.7 * X.age);
+  const impactWhy = X.has("knee") || X.has("ankle") || X.has("hip") ? "คุณมีอาการปวดข้อต่อช่วงขา เลยเลือกแบบแรงกระแทกต่ำ"
+                  : r.bmi && r.bmi >= 30 ? "เลือกแบบแรงกระแทกต่ำก่อน เพื่อลดแรงที่ข้อเข่าและข้อเท้า" : "";
+  let zone, zoneWhy;
+  if(r.parqYes){ zone = "ระดับที่พูดเป็นประโยคได้ แต่ร้องเพลงไม่ไหว"; zoneWhy = "คุณตอบว่ามีข้อในแบบคัดกรองสุขภาพ ยาบางตัวเปลี่ยนชีพจร เลยใช้การพูดเป็นตัววัดแทนตัวเลข"; }
+  else {
+    const low = X.easy || cs == null || cs < 50, pr = low ? [0.4, 0.55] : [0.5, 0.65], ph = low ? [0.6, 0.7] : [0.64, 0.76];
+    const lvl = low ? "ใช้ความหนักปานกลางค่อนเบา" : "ใช้ความหนักปานกลาง";
+    if(rhr){ zone = `ชีพจร ${Math.round(rhr + pr[0] * (hrMax - rhr))}–${Math.round(rhr + pr[1] * (hrMax - rhr))} ครั้ง/นาที`;
+      zoneWhy = `${lvl} คำนวณจากชีพจรขณะพัก ${rhr} ครั้ง/นาทีของคุณ (สูตร Karvonen ${Math.round(pr[0]*100)}–${Math.round(pr[1]*100)}%)`; }
+    else { zone = `ชีพจร ${Math.round(hrMax * ph[0])}–${Math.round(hrMax * ph[1])} ครั้ง/นาที`;
+      zoneWhy = `${lvl} คำนวณจากอายุ ${X.age} ปี (ชีพจรสูงสุดราว ${hrMax}) ถ้าวัดชีพจรขณะพักด้วยจะแม่นขึ้น`; } }
+  const mode = impactWhy ? "ปั่นจักรยาน หรือเดินเร็วทางราบ" : cs != null && cs >= 70 ? "วิ่งเบา ปั่นจักรยาน หรือว่ายน้ำ" : "เดินเร็ว ปั่นจักรยาน หรือวิ่งเบา";
+  if(k === "hiit"){
+    const [on, off, rounds] = cs == null || cs < 50 ? [20, 100, 5] : cs < 75 ? [30, 90, 6] : [30, 60, 8];
+    const fast = impactWhy ? "ปั่นเร็ว หรือย่ำเท้ายกเข่าเร็ว" : "วิ่ง ปั่น หรือย่ำเท้ายกเข่าเร็ว";
+    return {warm:"วอร์มอัพเดินเร็ว 5 นาที", list:[
+      it(`เร็ว ${on} วินาที (${fast})`, "march", `สลับช้า ${off} วิ × ${rounds} รอบ`,
+        `หัวใจและปอดได้ ${cs == null ? "–" : cs} คะแนน ${cs == null || cs < 50 ? "เลยเริ่มช่วงเร็วสั้นและพักนาน" : cs < 75 ? "ใช้สัดส่วนเร็ว:ช้า 1:3" : "พื้นฐานดีแล้ว ลดเวลาพักลงเป็น 1:2"} ช่วงเร็วควรหอบจนพูดได้แค่คำสั้นๆ (ราว 85–90% ของชีพจรสูงสุด ≈ ${Math.round(hrMax * 0.85)}–${Math.round(hrMax * 0.9)}) ${impactWhy}`.trim(),
+        "เพิ่มอีก 1–2 รอบ หรือลดเวลาพัก 15 วิ", "คาร์ดิโอต่อเนื่อง 20–30 นาที"),
+      it("คูลดาวน์เดินช้า", "walk", "5 นาที", "ให้ชีพจรค่อยๆ ลง ไม่หน้ามืด", null, null)],
+      note:`ช่วงเร็วทำเต็มที่แต่คุมท่าได้ ถ้าเวียนหัวหรือแน่นหน้าอกให้หยุดทันที`};
+  }
+  const base = Math.min(X.easy ? 30 : 60, cs == null ? 25 : cs < 45 ? 20 : cs < 65 ? 30 : 40), dur = Math.max(15, Math.min(base, mins - 5));
+  const lvTxt = cs == null ? "ไม่ได้ทดสอบหัวใจ เริ่มที่ระดับกลาง" : cs < 45 ? "เลยเริ่มที่ 20 นาทีก่อน" : cs < 65 || X.easy ? `เริ่มที่ ${base} นาที${X.easy && cs >= 65 ? " (เริ่มเบาก่อนเพราะเพิ่งเริ่มหรือมีข้อในแบบคัดกรอง)" : ""}` : "พื้นฐานดี ทำได้ 40 นาที";
+  return {warm:"", list:[it(mode, "walk", `${dur} นาที ต่อเนื่อง · ${zone}`,
+    `หัวใจและปอดได้ ${cs == null ? "–" : cs} คะแนน ${lvTxt} ${zoneWhy} ${impactWhy} โซนนี้ฝึกให้หัวใจสูบเลือดได้มากขึ้นต่อครั้ง และใช้ไขมันเป็นพลังงานได้ดี`.replace(/\s+/g, " ").trim(),
+    "เพิ่มสัปดาห์ละ 5 นาที จนถึง 45–60 นาที", dur > 20 ? "แบ่งเป็น 2 ช่วง ช่วงละ 10–15 นาที" : "เดินช้าลง แต่ยังต่อเนื่อง")],
+    note:"เป้าหมายรวมทั้งสัปดาห์ 150 นาทีขึ้นไป ตามคำแนะนำของ WHO และ ACSM นับรวมการเดินในชีวิตประจำวันได้"};
+}
+
+/* วันพลังและความคล่องตัว (สายกีฬา) */
+const POWER = [
+  ["กระโดดสควอต (หรือสควอตเร็ว)","jumpsquat","6–8 ครั้ง","ฝึกแรงระเบิดของขา ใช้ตอนกระโดดและออกตัว",{knee:["ก้าวขึ้นขั้นบันไดเร็ว","stepup","8 ครั้ง ข้างละ"], ankle:["สควอตเร็ว ไม่กระโดด","squat_free","8 ครั้ง"]}],
+  ["หมุนตัวเหวี่ยงแขน (ถือขวดน้ำ)","rotation","8 ครั้ง ข้างละ","ฝึกส่งแรงจากสะโพกผ่านลำตัว ใช้ในกีฬาที่ตี เหวี่ยง หรือขว้าง",{back:["หมุนตัวช่วงอก (นอนตะแคง)","openbook","8 ครั้ง ข้างละ"]}],
+  ["สเก็ตเตอร์ (กระโดดข้าง)","skater","8 ครั้ง ข้างละ","ฝึกเปลี่ยนทิศทางและลงน้ำหนักขาเดียวอย่างมั่นคง",{knee:["ก้าวข้างย่อเข่า","skater","8 ครั้ง ข้างละ"], ankle:["ก้าวข้างย่อเข่า","skater","8 ครั้ง ข้างละ"]}],
+  ["วิดพื้นดันเร็ว","push_full","6–8 ครั้ง","ฝึกแรงผลักที่เร็วของช่วงบน",{shoulder:["ดันกำแพงเร็ว","push_wall","10 ครั้ง"], wrist:["ดันกำแพงแบบกำมือ","push_wall","10 ครั้ง"]}],
+  ["วิ่งยกเข่าเร็ว","march","10 วินาที","ฝึกความถี่ของขาและการออกตัว",{knee:["ย่ำเท้าเร็ว","march","15 วินาที"], ankle:["ชกลมเร็ว (ยืนนิ่ง)","punch","15 วินาที"]}],
+  ["แพลงก์ด้านข้าง","sideplank","20–30 วินาที ข้างละ","ลำตัวที่มั่นคงช่วยส่งแรงจากขาไปแขนได้ไม่รั่ว",{}]
+];
+function powerDay(r){
+  const X = rxCtx(r), mins = Number(S.a.mins || 45), N = mins <= 30 ? 4 : mins <= 45 ? 5 : 6, sets = X.exp >= 2 ? 3 : 2;
+  const list = [], seen = new Set();
+  POWER.forEach(([name, a, rx, why, alt]) => {
+    if(list.length >= N) return;
+    let e = it(name, a, `${sets} เซต × ${rx}`, why, null, null);
+    for(const p of ["knee","ankle","back","shoulder","wrist"]){ if(X.has(p) && alt[p]){ e = it(alt[p][0], alt[p][1], `${sets} เซต × ${alt[p][2]}`, `${why} (ใช้ท่านี้แทนเพราะคุณมีอาการปวด${{knee:"เข่า",ankle:"ข้อเท้า",back:"หลัง",shoulder:"ไหล่",wrist:"ข้อมือ"}[p]})`, null, null); break; } }
+    if(seen.has(e.n)) return; seen.add(e.n); list.push(e);
+  });
+  return {warm:"วอร์มอัพ 8 นาที: เดินเร็ว หมุนข้อต่อ สควอตตัวเปล่า ก้าวข้าง", list, note:"ทำทุกครั้งให้เร็วและคุณภาพดี พักเต็มที่ 60–90 วิ ไม่ต้องทำจนหอบ ถ้าความเร็วตกให้หยุดเซตนั้น"};
+}
+function exLi(e){
+  const an = e.a || EX_ANIM[e.n];
+  return `<li class="${an ? "has-anim" : ""}">${an ? `<canvas data-anim="${an}" width="400" height="280" aria-label="ภาพเคลื่อนไหวท่า ${e.n}"></canvas>` : ""}<div><span>${e.n}</span><b>${e.rx}</b>${e.why ? `<small class="exwhy">ทำไมท่านี้: ${e.why}</small>` : ""}${e.up || e.down ? `<small class="exlad">${e.up ? `<i>สบายแล้ว →</i> ${e.up}` : ""}${e.up && e.down ? "<br>" : ""}${e.down ? `<i>ยากไป →</i> ${e.down}` : ""}</small>` : ""}</div></li>`;
+}
+function exercises(k, r){
+  if(k === "z2" || k === "hiit") return cardioDay(k, r);
+  if(k === "mob" || k === "corr") return flexDay(k, r);
+  if(k === "power") return powerDay(r);
+  return strengthDay(k, r);
+}
+
+function coachHelps(r){
+  const a = S.a, out = [];
+  const flex = r.dom[2].s;
+  if(r.pain.length || a.goal === "pain" || (flex != null && flex < 60)) out.push("ประเมินท่าทางและหาต้นเหตุของจุดตึงหรือปวด แล้วแก้ด้วยหลักคอร์เรกทีฟ (NCSF CES)");
+  if(a.goal === "fat" || a.goal === "muscle") out.push("โปรแกรมเวทลดไขมันหรือเพิ่มกล้าม ที่ปรับตามผลจริงของคุณทุกเดือน");
+  if(a.goal === "sport") out.push("ฟิตเนสเฉพาะกีฬา รวมถึงโปรแกรมสำหรับนักกอล์ฟ (Swing Catalyst L1)");
+  if(r.dom[4].s != null && r.dom[4].s < 65) out.push("วางแผนอาหารแบบทำได้จริงในชีวิตประจำวัน ไม่ต้องอดสุดโต่ง");
+  if(a.exp === "0" || a.exp === "1") out.push("สอนท่าพื้นฐานให้ถูกตั้งแต่วันแรก ลดความเสี่ยงบาดเจ็บ");
+  if(r.pain.length) out.push("นวดกีฬาเพื่อช่วยฟื้นตัวและคลายกล้ามเนื้อที่ตึง");
+  if(out.length < 3) out.push("ทดสอบซ้ำทุก 8 สัปดาห์ เพื่อดูพัฒนาการเป็นตัวเลข");
+  return out.slice(0,4);
+}
+
+/* ---------- radar ---------- */
+function radar(vals, labels, size){
+  const cx = size/2, cy = size/2 + 4, R = size*0.32, N = vals.length;
+  const pt = (i, f) => { const ang = -Math.PI/2 + i*2*Math.PI/N; return [cx + Math.cos(ang)*R*f, cy + Math.sin(ang)*R*f]; };
+  let g = "";
+  [0.25,0.5,0.75,1].forEach(f => { g += `<polygon points="${vals.map((_,i)=>pt(i,f).join(",")).join(" ")}" fill="none" stroke="var(--line)" stroke-width="1"/>`; });
+  vals.forEach((_,i) => { const [x,y] = pt(i,1); g += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)"/>`; });
+  const poly = vals.map((v,i) => pt(i, Math.max(0.04,(v||0)/100)).join(",")).join(" ");
+  g += `<polygon points="${poly}" fill="var(--accent)" fill-opacity=".18" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
+  vals.forEach((v,i) => { const [x,y] = pt(i, Math.max(0.04,(v||0)/100)); g += `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--accent)"/>`; });
+  if(labels){ labels.forEach((l,i) => { const [x,y] = pt(i,1.28); const anchor = Math.abs(x-cx) < 6 ? "middle" : x > cx ? "start" : "end";
+    g += `<text x="${x}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Sans Thai, sans-serif">${l}</text>`; }); }
+  const pad = labels ? 36 : 0;
+  return `<svg viewBox="${-pad} 0 ${size + pad*2} ${size+8}" role="img" aria-label="กราฟใยแมงมุมคะแนน 5 ด้าน">${g}</svg>`;
+}
+const SHORT = ["แข็งแรง","หัวใจ","ยืดหยุ่น","สัดส่วน","ไลฟ์สไตล์"];
+
+/* ---------- การ์ดตัวละครประจำสาย ---------- */
+const CARD = {
+  strength:{no:1, bg:"#0b1a14", acc:"#3fd18f", soft:"#103224", ink:"#e8f5ee", mute:"#8fb8a4", d:"ตัวยังเล็ก แรงยังน้อย", sk:"โตไวที่สุดใน 6–8 สัปดาห์แรก",
+    m:'<path class="m-float" d="M54 52 q5 9 0 12 q-5 -3 0 -12 z" fill="#7fd0ff"/><ellipse cx="85" cy="116" rx="30" ry="22" fill="#b9c4c9"/><rect x="62" y="124" width="13" height="20" rx="6" fill="#aab6bc"/><rect x="95" y="124" width="13" height="20" rx="6" fill="#aab6bc"/><ellipse cx="59" cy="80" rx="15" ry="19" fill="#aab6bc"/><ellipse cx="59" cy="80" rx="8" ry="12" fill="#e8b9c4"/><ellipse cx="111" cy="80" rx="15" ry="19" fill="#aab6bc"/><ellipse cx="111" cy="80" rx="8" ry="12" fill="#e8b9c4"/><circle cx="85" cy="80" r="24" fill="#c8d2d6"/><circle cx="76" cy="75" r="3.2" fill="#0b1a14"/><circle cx="94" cy="75" r="3.2" fill="#0b1a14"/><circle cx="71" cy="85" r="3.5" fill="#e8b9c4" opacity=".8"/><circle cx="99" cy="85" r="3.5" fill="#e8b9c4" opacity=".8"/><g class="m-bob"><path d="M85 88 C85 102 98 106 105 96 C111 86 113 72 118 62" fill="none" stroke="#c8d2d6" stroke-width="9" stroke-linecap="round"/><rect x="110" y="55" width="18" height="4" rx="2" fill="#9fb3aa"/><rect x="107" y="49" width="5" height="16" rx="2" fill="#5d7068"/><rect x="126" y="49" width="5" height="16" rx="2" fill="#5d7068"/></g><path class="m-pulse" d="M40 70 l5 -9 l-1 6 l5 -1 l-6 10 l1 -6 z" fill="#f5c84b"/>'},
+  cardio:{no:2, bg:"#1a0f12", acc:"#ff6b6b", soft:"#2c1519", ink:"#ffe5e5", mute:"#c99a9a", d:"เหนื่อยไว หอบง่าย", sk:"ฝึกหัวใจแล้วหายใจโล่ง",
+    m:'<path class="m-beat" d="M128 52 c-9 -6 -9 -15 -3 -15 c2 0 3 2 3 3 c0 -1 1 -3 3 -3 c6 0 6 9 -3 15 z" fill="#ff6b6b"/><path class="m-float" d="M44 62 q5 9 0 12 q-5 -3 0 -12 z" fill="#7fd0ff"/><path class="m-float" style="animation-delay:.8s" d="M128 72 q4 7 0 10 q-4 -3 0 -10 z" fill="#7fd0ff"/><ellipse cx="85" cy="134" rx="24" ry="12" fill="#e3c08f"/><path d="M56 64 L46 92 L66 82 Z" fill="#4a3a2c"/><path d="M114 64 L124 92 L104 82 Z" fill="#4a3a2c"/><circle cx="85" cy="86" r="32" fill="#e3c08f"/><path d="M74 64 q11 -5 22 0 M76 70 q9 -4 18 0" fill="none" stroke="#b8956a" stroke-width="2" stroke-linecap="round"/><circle cx="71" cy="80" r="7" fill="#1a0f12"/><circle cx="99" cy="80" r="7" fill="#1a0f12"/><circle cx="73" cy="78" r="2" fill="#fff"/><circle cx="101" cy="78" r="2" fill="#fff"/><ellipse cx="85" cy="99" rx="18" ry="14" fill="#4a3a2c"/><ellipse cx="85" cy="92" rx="6" ry="4" fill="#1a0f12"/><g class="m-bob"><ellipse cx="85" cy="110" rx="6" ry="9" fill="#ff6b6b"/><path d="M85 104 v10" stroke="#d94a4a" stroke-width="1.5"/></g><circle class="m-float" style="animation-delay:.4s" cx="60" cy="112" r="4" fill="#5a3a40"/><circle class="m-float" style="animation-delay:1.2s" cx="112" cy="112" r="3.5" fill="#5a3a40"/>'},
+  flex:{no:3, bg:"#0e1424", acc:"#6ea8ff", soft:"#16213a", ink:"#e6eeff", mute:"#8fa3c7", d:"ข้อต่อขยับได้ไม่สุด", sk:"ยืดทุกวันแล้วก้มได้สบาย",
+    m:'<ellipse cx="122" cy="146" rx="22" ry="5" fill="#6ea8ff" opacity=".55"/><ellipse cx="62" cy="118" rx="26" ry="15" fill="#f2c260"/><rect x="44" y="126" width="7" height="22" rx="3" fill="#f2c260"/><rect x="72" y="126" width="7" height="22" rx="3" fill="#f2c260"/><path d="M72 112 L96 60" stroke="#f2c260" stroke-width="14" stroke-linecap="round"/><circle cx="54" cy="114" r="4" fill="#c98a3a"/><circle cx="68" cy="122" r="3.5" fill="#c98a3a"/><circle cx="76" cy="98" r="3" fill="#c98a3a"/><circle cx="86" cy="80" r="3" fill="#c98a3a"/><circle cx="62" cy="108" r="2.5" fill="#c98a3a"/><g class="m-bob"><ellipse cx="104" cy="54" rx="16" ry="10" fill="#f2c260"/><path d="M96 46 l-2 -10 M104 45 l1 -10" stroke="#c98a3a" stroke-width="2.5" stroke-linecap="round"/><circle cx="94" cy="35" r="2.6" fill="#c98a3a"/><circle cx="105" cy="34" r="2.6" fill="#c98a3a"/><circle cx="102" cy="51" r="2.6" fill="#0e1424"/><path d="M110 58 q5 2 8 -1" fill="none" stroke="#0e1424" stroke-width="1.6" stroke-linecap="round"/></g><path class="m-pulse" d="M110 74 l7 -3 M112 82 l8 0 M108 90 l7 3" stroke="#f5c84b" stroke-width="2" stroke-linecap="round"/><path d="M118 112 q4 10 0 22" fill="none" stroke="#8fa3c7" stroke-width="1.5" stroke-dasharray="3 3"/>'},
+  body:{no:4, bg:"#1c1408", acc:"#f5a623", soft:"#2e210d", ink:"#fff0d6", mute:"#c9a878", d:"สัดส่วนกำลังรอเปลี่ยน", sk:"เปลี่ยนร่างได้เสมอ",
+    m:'<g class="m-tw"><path d="M85 82 C62 48 34 54 40 82 C44 98 66 98 85 90 Z" fill="none" stroke="#f5a623" stroke-width="2" stroke-dasharray="4 4"/><path d="M85 82 C108 48 136 54 130 82 C126 98 104 98 85 90 Z" fill="none" stroke="#f5a623" stroke-width="2" stroke-dasharray="4 4"/></g><path d="M30 142 h112" stroke="#6b5232" stroke-width="4" stroke-linecap="round"/><g class="m-bob"><circle cx="46" cy="128" r="10" fill="#8bc34a"/><circle cx="62" cy="124" r="11" fill="#9ccc65"/><circle cx="80" cy="121" r="12" fill="#8bc34a"/><circle cx="98" cy="121" r="12" fill="#9ccc65"/><circle cx="46" cy="138" r="2" fill="#6b8f2e"/><circle cx="62" cy="136" r="2" fill="#6b8f2e"/><circle cx="80" cy="134" r="2" fill="#6b8f2e"/><circle cx="98" cy="134" r="2" fill="#6b8f2e"/><circle cx="116" cy="108" r="15" fill="#9ccc65"/><path d="M110 95 l-4 -10 M122 95 l4 -10" stroke="#6b8f2e" stroke-width="2"/><circle cx="106" cy="84" r="3" fill="#f5a623"/><circle cx="126" cy="84" r="3" fill="#f5a623"/><circle cx="111" cy="106" r="2.6" fill="#1c1408"/><circle cx="121" cy="106" r="2.6" fill="#1c1408"/><path d="M111 113 q5 4 10 0" fill="none" stroke="#1c1408" stroke-width="1.8" stroke-linecap="round"/></g><path class="m-tw" style="animation-delay:.6s" d="M140 60 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 z" fill="#f5c84b"/>'},
+  life:{no:5, bg:"#150f22", acc:"#b18cff", soft:"#221838", ink:"#efe8ff", mute:"#a596c7", d:"นั่งนาน ขยับน้อย", sk:"ขยับวันละนิด ร่างกายเปลี่ยน",
+    m:'<path d="M22 52 C60 44 110 44 150 54" fill="none" stroke="#6b5232" stroke-width="7" stroke-linecap="round"/><ellipse cx="34" cy="46" rx="6" ry="3" fill="#6fb36a"/><ellipse cx="138" cy="48" rx="6" ry="3" fill="#6fb36a"/><path d="M128 52 L146 70 M137 52 L137 72 M146 54 L128 70" stroke="#6f6690" stroke-width="1"/><path d="M132 60 q5 3 10 0" fill="none" stroke="#6f6690" stroke-width="1"/><text class="m-pulse" x="22" y="74" font-size="10" font-weight="700" fill="#b18cff" font-family="sans-serif">0 ก้าว</text><g class="m-bob"><path d="M66 50 L72 82 M104 50 L98 82" stroke="#9c8a78" stroke-width="9" stroke-linecap="round"/><path d="M62 48 l2 6 M66 47 l1 6 M108 48 l-2 6 M104 47 l-1 6" stroke="#e8dccb" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="85" cy="102" rx="22" ry="28" fill="#9c8a78"/><path d="M74 126 L72 140 M96 126 L98 140" stroke="#9c8a78" stroke-width="8" stroke-linecap="round"/><ellipse cx="85" cy="88" rx="15" ry="13" fill="#e8dccb"/><ellipse cx="78" cy="88" rx="5.5" ry="3.5" fill="#6b5a4a" transform="rotate(-15 78 88)"/><ellipse cx="92" cy="88" rx="5.5" ry="3.5" fill="#6b5a4a" transform="rotate(15 92 88)"/><path d="M75 88 q3 2 6 0 M89 88 q3 2 6 0" fill="none" stroke="#efe8ff" stroke-width="1.5" stroke-linecap="round"/><ellipse cx="85" cy="94" rx="3" ry="2" fill="#3a2e24"/><path d="M81 98 q4 3 8 0" fill="none" stroke="#3a2e24" stroke-width="1.6" stroke-linecap="round"/></g>'},
+  top:{no:6, rare:true, bg:"#1a1606", acc:"#f5c84b", soft:"#2b250b", ink:"#fff6d6", mute:"#c9b873", d:"ดีรอบด้าน", sk:"พร้อมเลเวลถัดไป",
+    m:'<path d="M60 104 C40 122 44 142 56 148 L85 130 L114 148 C126 142 130 122 110 104 Z" fill="#3fd18f"/><g class="m-bob"><circle cx="85" cy="84" r="36" fill="#c97b2a"/><circle cx="58" cy="66" r="10" fill="#c97b2a"/><circle cx="112" cy="66" r="10" fill="#c97b2a"/><circle cx="50" cy="90" r="10" fill="#c97b2a"/><circle cx="120" cy="90" r="10" fill="#c97b2a"/><circle cx="62" cy="112" r="10" fill="#c97b2a"/><circle cx="108" cy="112" r="10" fill="#c97b2a"/><circle cx="85" cy="86" r="24" fill="#f2c260"/><circle cx="76" cy="80" r="3" fill="#1a1606"/><circle cx="94" cy="80" r="3" fill="#1a1606"/><ellipse cx="85" cy="94" rx="10" ry="7" fill="#fff3c4"/><path d="M81 90 h8 l-4 4 z" fill="#5a3a1a"/><path d="M80 98 q5 4 10 0" fill="none" stroke="#5a3a1a" stroke-width="1.8" stroke-linecap="round"/><path d="M72 52 L76 40 L85 48 L94 40 L98 52 Z" fill="#f5c84b" stroke="#fff3c4" stroke-width="1"/></g><path class="m-tw" d="M30 54 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 z" fill="#fff3c4"/><path class="m-tw" style="animation-delay:.8s" d="M142 120 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 z" fill="#fff3c4"/>'},
+  tank:{no:8, bg:"#14160d", acc:"#a3c46b", soft:"#22261a", ink:"#eef5dd", mute:"#a8b38f", d:"แรงเยอะ แต่หมดเร็ว", sk:"เติมคาร์ดิโอแล้วลุยได้ทั้งวัน",
+    m:'<circle cx="38" cy="58" r="12" fill="#2a2d1e" stroke="#a3c46b" stroke-width="2"/><text x="31" y="54" font-size="7" fill="#ff6b6b" font-family="sans-serif">E</text><text x="41" y="54" font-size="7" fill="#a8b38f" font-family="sans-serif">F</text><line class="m-pulse" x1="38" y1="60" x2="30" y2="56" stroke="#ff6b6b" stroke-width="2.5" stroke-linecap="round"/><path class="m-float" d="M122 54 q5 9 0 12 q-5 -3 0 -12 z" fill="#7fd0ff"/><rect x="118" y="136" width="26" height="4" rx="2" fill="#9fb3aa"/><rect x="114" y="129" width="6" height="18" rx="2" fill="#5d7068"/><rect x="142" y="129" width="6" height="18" rx="2" fill="#5d7068"/><ellipse cx="85" cy="114" rx="34" ry="28" fill="#3f4038"/><path d="M56 98 C40 112 40 132 46 144 M114 98 C130 112 130 132 124 144" fill="none" stroke="#3f4038" stroke-width="13" stroke-linecap="round"/><ellipse cx="85" cy="118" rx="18" ry="16" fill="#5a5a50"/><g class="m-bob"><circle cx="85" cy="74" r="21" fill="#3f4038"/><ellipse cx="85" cy="80" rx="15" ry="13" fill="#9a8a78"/><path d="M71 70 h28" stroke="#2a2b25" stroke-width="5" stroke-linecap="round"/><path d="M75 76 h6 M89 76 h6" stroke="#2a2b25" stroke-width="2.5" stroke-linecap="round"/><circle cx="82" cy="83" r="1.6" fill="#2a2b25"/><circle cx="88" cy="83" r="1.6" fill="#2a2b25"/><path d="M79 89 q6 3 12 0" fill="none" stroke="#2a2b25" stroke-width="2" stroke-linecap="round"/><ellipse cx="88" cy="93" rx="4" ry="5" fill="#ff6b6b"/></g>'},
+  rabbit:{no:9, bg:"#1b1220", acc:"#ff8fc8", soft:"#2a1a30", ink:"#ffe8f4", mute:"#c49ab3", d:"เหนื่อยช้า แต่แรงยังน้อย", sk:"ใส่แรงเพิ่มแล้วไปได้ไกลกว่าเดิม",
+    m:'<path d="M28 96 h16 M24 106 h20 M30 116 h12" stroke="#ff8fc8" stroke-width="2" stroke-linecap="round" opacity=".7"/><g class="m-bob"><ellipse cx="76" cy="42" rx="7" ry="20" fill="#fff" transform="rotate(-12 76 42)"/><ellipse cx="76" cy="44" rx="3" ry="13" fill="#ffb3d9" transform="rotate(-12 76 44)"/><ellipse cx="96" cy="42" rx="7" ry="20" fill="#fff" transform="rotate(12 96 42)"/><ellipse cx="96" cy="44" rx="3" ry="13" fill="#ffb3d9" transform="rotate(12 96 44)"/><circle cx="86" cy="72" r="19" fill="#fff"/><circle cx="79" cy="70" r="2.8" fill="#1b1220"/><circle cx="93" cy="70" r="2.8" fill="#1b1220"/><circle cx="86" cy="77" r="2.5" fill="#ff8fc8"/><path d="M81 81 Q86 85 91 81" fill="none" stroke="#1b1220" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="86" cy="106" rx="15" ry="19" fill="#fff"/><path d="M73 100 l-6 5 M99 100 l6 5" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path class="m-beat" d="M86 112 c-6 -4 -6 -10 -2 -10 c1 0 2 1 2 2 c0 -1 1 -2 2 -2 c4 0 4 6 -2 10 z" fill="#ff8fc8"/></g><path d="M80 122 L64 146" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M92 122 L108 136 L122 134" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'},
+  noodle:{no:10, bg:"#1c1606", acc:"#ffd25e", soft:"#2d240b", ink:"#fff4d1", mute:"#c9b27a", d:"ยืดได้สุด แต่แรงยังคุมไม่อยู่", sk:"เพิ่มแรงแล้วข้อต่อนิ่ง",
+    m:'<g class="m-bob"><path d="M64 96 C54 112 66 120 56 134 M72 100 C68 118 80 124 72 142 M85 102 C85 120 94 126 88 144 M98 100 C102 118 92 124 100 142 M106 96 C116 110 104 120 114 134" fill="none" stroke="#ff9f6b" stroke-width="7" stroke-linecap="round"/><path d="M110 90 C126 90 134 104 132 118" fill="none" stroke="#ff9f6b" stroke-width="6" stroke-linecap="round"/><rect x="122" y="118" width="18" height="4" rx="2" fill="#9fb3aa"/><rect x="119" y="113" width="5" height="14" rx="2" fill="#5d7068"/><rect x="138" y="113" width="5" height="14" rx="2" fill="#5d7068"/><ellipse cx="85" cy="74" rx="27" ry="29" fill="#ff9f6b"/><circle cx="74" cy="58" r="3" fill="#ffc29e"/><circle cx="96" cy="54" r="2.5" fill="#ffc29e"/><circle cx="88" cy="62" r="2" fill="#ffc29e"/><circle cx="76" cy="78" r="4" fill="#1c1606"/><circle cx="94" cy="78" r="4" fill="#1c1606"/><circle cx="77" cy="77" r="1.3" fill="#fff"/><circle cx="95" cy="77" r="1.3" fill="#fff"/><path d="M79 88 q6 5 12 0" fill="none" stroke="#1c1606" stroke-width="2" stroke-linecap="round"/><circle cx="68" cy="86" r="3.5" fill="#ff7a6b" opacity=".7"/><circle cx="102" cy="86" r="3.5" fill="#ff7a6b" opacity=".7"/></g><path class="m-pulse" d="M130 100 q4 -4 8 0 M134 94 q4 -4 8 0" fill="none" stroke="#c9b27a" stroke-width="1.6" stroke-linecap="round"/>'},
+  safe:{no:11, bg:"#11161a", acc:"#9fb8c8", soft:"#1b252c", ink:"#e8f1f6", mute:"#93a6b2", d:"แรงเยอะ แต่ตัวตึง", sk:"ปลดเกราะแล้วยกได้เต็มช่วง",
+    m:'<g class="m-bob"><line x1="28" y1="50" x2="142" y2="50" stroke="#9fb3aa" stroke-width="4" stroke-linecap="round"/><rect x="26" y="40" width="9" height="20" rx="2" fill="#5d7180"/><rect x="36" y="42" width="6" height="16" rx="2" fill="#7d93a3"/><rect x="135" y="40" width="9" height="20" rx="2" fill="#5d7180"/><rect x="128" y="42" width="6" height="16" rx="2" fill="#7d93a3"/><path d="M68 80 L56 52 M102 80 L114 52" stroke="#2b3740" stroke-width="4" stroke-linecap="round"/><path d="M80 66 C78 54 82 44 92 38 C88 48 90 56 92 66 Z" fill="#4d5d6b"/></g><ellipse cx="85" cy="76" rx="15" ry="12" fill="#3b4955"/><circle cx="79" cy="74" r="2.6" fill="#e8f1f6"/><circle cx="91" cy="74" r="2.6" fill="#e8f1f6"/><path d="M80 82 h10" stroke="#e8f1f6" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="85" cy="110" rx="26" ry="30" fill="#4d5d6b"/><path d="M85 82 v56" stroke="#2b3740" stroke-width="2"/><ellipse cx="74" cy="100" rx="6" ry="10" fill="#5f7282" opacity=".7"/><path d="M60 110 L44 116 M60 124 L46 134 M110 110 L126 116 M110 124 L124 134" stroke="#2b3740" stroke-width="3.5" stroke-linecap="round"/><path d="M58 116 h54" stroke="#c9a34a" stroke-width="4" stroke-dasharray="6 3"/><path d="M82 110 a4 4 0 0 1 8 0" fill="none" stroke="#f5c84b" stroke-width="2"/><rect class="m-pulse" x="79" y="111" width="14" height="11" rx="2" fill="#f5c84b"/><path d="M76 138 l-4 10 M94 138 l4 10" stroke="#2b3740" stroke-width="3.5" stroke-linecap="round"/>'},
+  kangaroo:{no:12, bg:"#1a120a", acc:"#e89a5c", soft:"#2b1d10", ink:"#fbe9d8", mute:"#c4a184", d:"ขาแรง แต่แขนยังเบา", sk:"ปั้นช่วงบนแล้วครบเครื่อง",
+    m:'<g class="m-bob"><path d="M66 120 C46 124 34 134 26 146" fill="none" stroke="#c8784a" stroke-width="8" stroke-linecap="round"/><ellipse cx="88" cy="98" rx="18" ry="25" fill="#c8784a"/><ellipse cx="90" cy="104" rx="10" ry="15" fill="#f0c9a3"/><ellipse cx="80" cy="44" rx="4" ry="11" fill="#c8784a" transform="rotate(-15 80 44)"/><ellipse cx="100" cy="44" rx="4" ry="11" fill="#c8784a" transform="rotate(15 100 44)"/><ellipse cx="92" cy="62" rx="15" ry="13" fill="#c8784a"/><ellipse cx="102" cy="68" rx="8" ry="6" fill="#d98e5e"/><circle cx="86" cy="59" r="2.6" fill="#1a120a"/><circle cx="98" cy="59" r="2.6" fill="#1a120a"/><circle cx="108" cy="67" r="2" fill="#1a120a"/><path d="M102 86 l7 4" stroke="#c8784a" stroke-width="3.5" stroke-linecap="round"/><circle cx="111" cy="91" r="3.5" fill="#ff6b6b"/><ellipse cx="78" cy="122" rx="15" ry="13" fill="#b46a3e"/></g><rect x="62" y="140" width="40" height="8" rx="4" fill="#b46a3e"/>'},
+  turtle:{no:13, bg:"#0d1712", acc:"#7fd17a", soft:"#16261c", ink:"#e3f7e1", mute:"#95b894", d:"นั่งนาน ไหล่ห่อ คอยื่น", sk:"ยืดตัวตรงแล้วดูดีขึ้นทันที",
+    m:'<rect x="24" y="122" width="124" height="5" rx="2" fill="#5b4a36"/><rect x="112" y="98" width="30" height="20" rx="2" fill="#cfd8dc"/><rect x="115" y="101" width="24" height="14" fill="#7fd0ff"/><rect x="106" y="118" width="40" height="4" rx="1" fill="#9aa5ab"/><path d="M44 120 C44 82 100 78 104 120 Z" fill="#4f8f4c"/><path d="M58 104 l10 -8 l12 0 l8 8 l-8 9 l-12 0 z" fill="none" stroke="#3a6e38" stroke-width="2"/><path d="M50 112 l8 -8 M92 104 l8 8" stroke="#3a6e38" stroke-width="2"/><g class="m-poke"><path d="M98 102 C108 96 112 86 116 78" fill="none" stroke="#a8e0a0" stroke-width="9" stroke-linecap="round"/><circle cx="120" cy="72" r="11" fill="#a8e0a0"/><circle cx="124" cy="70" r="2.5" fill="#0d1712"/><path d="M120 78 q4 2 7 0" fill="none" stroke="#0d1712" stroke-width="1.6" stroke-linecap="round"/></g><path d="M60 120 l-4 10 M90 120 l4 10" stroke="#a8e0a0" stroke-width="6" stroke-linecap="round"/><path class="m-pulse" d="M134 56 l4 -6 M140 62 l6 -2" stroke="#f5c84b" stroke-width="2" stroke-linecap="round"/>'},
+  owl:{no:14, bg:"#0f1022", acc:"#8fa0ff", soft:"#1a1c38", ink:"#e6e9ff", mute:"#9aa0c9", d:"นอนน้อยกว่า 6 ชม.", sk:"นอนพอแล้วฟื้นตัวไวขึ้น",
+    m:'<path d="M36 50 a12 12 0 1 0 12 -14 a9 9 0 1 1 -12 14 z" fill="#f5e6a8"/><g class="m-bob"><path d="M60 58 L66 40 L74 56 Z M110 58 L104 40 L96 56 Z" fill="#7a5c42"/><ellipse cx="85" cy="96" rx="30" ry="40" fill="#8a6b4f"/><ellipse cx="85" cy="110" rx="18" ry="22" fill="#c9a37e"/><path d="M76 104 q4 3 8 0 M86 112 q4 3 8 0 M76 120 q4 3 8 0" fill="none" stroke="#8a6b4f" stroke-width="1.5"/><circle cx="72" cy="78" r="12" fill="#fff"/><circle cx="98" cy="78" r="12" fill="#fff"/><circle cx="72" cy="81" r="4" fill="#0f1022"/><circle cx="98" cy="81" r="4" fill="#0f1022"/><path d="M60 77 a12 12 0 0 1 24 0 Z M86 77 a12 12 0 0 1 24 0 Z" fill="#8a6b4f"/><path d="M62 92 q10 5 20 0 M88 92 q10 5 20 0" fill="none" stroke="#6f61c0" stroke-width="2.5" stroke-linecap="round"/><path d="M85 86 l-5 6 h10 z" fill="#f5a623"/></g><rect x="114" y="104" width="16" height="18" rx="3" fill="#c79563"/><path d="M130 108 q6 0 6 5 q0 5 -6 5" fill="none" stroke="#c79563" stroke-width="3"/><path class="m-float" d="M118 98 q-3 -6 0 -10 M124 98 q-3 -6 0 -10" fill="none" stroke="#e6e9ff" stroke-width="1.5" stroke-linecap="round"/>'},
+  volcano:{no:15, bg:"#1c0d0a", acc:"#ff7a45", soft:"#2e1510", ink:"#ffe6dc", mute:"#c9988a", d:"เครียดสะสม", sk:"ปล่อยลมด้วยการขยับ",
+    m:'<circle class="m-float" cx="40" cy="70" r="5" fill="none" stroke="#7fd0ff" stroke-width="1.5"/><circle class="m-float" style="animation-delay:.7s" cx="132" cy="62" r="4" fill="none" stroke="#7fd0ff" stroke-width="1.5"/><circle class="m-float" style="animation-delay:1.3s" cx="138" cy="84" r="3" fill="none" stroke="#7fd0ff" stroke-width="1.5"/><g class="m-beat"><path d="M85 48 l4 -10 l4 10 M112 58 l9 -6 l-1 10 M122 86 l10 0 l-8 6 M112 114 l9 6 l-10 1 M85 124 l4 10 l4 -10 M58 114 l-9 6 l10 1 M48 86 l-10 0 l8 6 M58 58 l-9 -6 l1 10" fill="#e8a94a"/><circle cx="85" cy="86" r="36" fill="#ffcf7a"/><ellipse cx="85" cy="100" rx="24" ry="16" fill="#fff0c9"/><path d="M68 72 l12 5 M102 72 l-12 5" stroke="#1c0d0a" stroke-width="3" stroke-linecap="round"/><circle cx="74" cy="82" r="4" fill="#1c0d0a"/><circle cx="96" cy="82" r="4" fill="#1c0d0a"/><path d="M76 100 q4 -4 9 0 q5 4 9 0" fill="none" stroke="#1c0d0a" stroke-width="2.5" stroke-linecap="round"/></g><path d="M121 86 l14 -10 v20 z" fill="#ff7a45"/><path class="m-pulse" d="M60 40 q-3 -6 0 -10 M110 40 q3 -6 0 -10" fill="none" stroke="#c9988a" stroke-width="2" stroke-linecap="round"/>'},
+  core:{no:16, rare:true, bg:"#121417", acc:"#c9d3dc", soft:"#1e2227", ink:"#f2f5f8", mute:"#9aa3ad", d:"แพลงก์ 2 นาทีขึ้นไป", sk:"แกนกลางไม่สะเทือน",
+    m:'<path class="m-tw" d="M30 56 l3 7 l7 1 l-5 5 l1 7 l-6 -3 l-6 3 l1 -7 l-5 -5 l7 -1 z" fill="#f5c84b"/><path class="m-tw" style="animation-delay:.7s" d="M144 66 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 z" fill="#f5c84b"/><text class="m-pulse" x="85" y="64" font-size="13" font-weight="700" text-anchor="middle" fill="#f5c84b" font-family="sans-serif">2:00+</text><path d="M20 132 h134" stroke="#3a4148" stroke-width="3" stroke-linecap="round"/><path d="M22 112 L44 104 L44 118 Z" fill="#5f8a5a"/><rect x="40" y="98" width="72" height="22" rx="11" fill="#5f8a5a"/><path d="M50 98 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5 l4 -5 l4 5" fill="#4b7046"/><rect x="104" y="96" width="44" height="14" rx="6" fill="#6f9a69"/><rect x="104" y="108" width="40" height="8" rx="4" fill="#5f8a5a"/><path d="M110 110 l3 -4 l3 4 l3 -4 l3 4 l3 -4 l3 4 l3 -4 l3 4" fill="#fff"/><circle cx="112" cy="92" r="6" fill="#6f9a69"/><circle cx="113" cy="91" r="2.6" fill="#121417"/><path d="M106 86 h14" stroke="#f5c84b" stroke-width="3" stroke-linecap="round"/><rect x="96" y="118" width="10" height="14" rx="3" fill="#5f8a5a"/><rect x="92" y="128" width="20" height="5" rx="2" fill="#4b7046"/><rect x="46" y="118" width="9" height="14" rx="3" fill="#5f8a5a"/>'},
+  cheetah:{no:17, rare:true, bg:"#19130a", acc:"#f2b84b", soft:"#2a200f", ink:"#fff1d6", mute:"#c8ad7c", d:"ชีพจรขณะพักต่ำกว่า 60", sk:"หัวใจสูบฉีดทรงพลัง",
+    m:'<ellipse cx="85" cy="130" rx="26" ry="16" fill="#e0a43a"/><g class="m-bob"><circle cx="62" cy="62" r="9" fill="#e0a43a"/><circle cx="108" cy="62" r="9" fill="#e0a43a"/><circle cx="62" cy="62" r="4" fill="#3a2a12"/><circle cx="108" cy="62" r="4" fill="#3a2a12"/><circle cx="85" cy="88" r="30" fill="#f2b84b"/><circle cx="66" cy="78" r="2" fill="#3a2a12"/><circle cx="104" cy="76" r="2" fill="#3a2a12"/><circle cx="70" cy="104" r="2" fill="#3a2a12"/><circle cx="102" cy="104" r="2" fill="#3a2a12"/><circle cx="85" cy="66" r="2" fill="#3a2a12"/><rect x="64" y="80" width="18" height="11" rx="5" fill="#1b1b1b"/><rect x="88" y="80" width="18" height="11" rx="5" fill="#1b1b1b"/><path d="M82 84 h6" stroke="#1b1b1b" stroke-width="2"/><path d="M70 91 q-2 8 2 14 M100 91 q2 8 -2 14" fill="none" stroke="#3a2a12" stroke-width="2" stroke-linecap="round"/><ellipse cx="85" cy="100" rx="9" ry="7" fill="#fff1d6"/><path d="M82 97 h6 l-3 3 z" fill="#3a2a12"/><path d="M80 104 q5 4 10 0" fill="none" stroke="#3a2a12" stroke-width="1.8" stroke-linecap="round"/></g><g class="m-slowbeat"><path d="M128 120 c-9 -6 -9 -15 -3 -15 c2 0 3 2 3 3 c0 -1 1 -3 3 -3 c6 0 6 9 -3 15 z" fill="#ff6b6b"/></g><path d="M30 132 h10 l4 -6 l5 12 l4 -6 h12" fill="none" stroke="#f2b84b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'},
+  legend:{no:18, tier:"LEGENDARY", bg:"#160f1f", acc:"#ffd166", soft:"#2a1d38", ink:"#fff6dc", mute:"#c8b4d8", d:"ทุกด้าน 85 ขึ้นไป", sk:"ตำนานที่ใครก็อยากเป็น",
+    m:'<path class="m-tw" d="M28 50 l3 7 l7 1 l-5 5 l1 7 l-6 -3 l-6 3 l1 -7 l-5 -5 l7 -1 z" fill="#ffd166"/><path class="m-tw" style="animation-delay:.5s" d="M140 46 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 z" fill="#fff6dc"/><path class="m-tw" style="animation-delay:1s" d="M142 120 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 z" fill="#ffd166"/><g class="m-flapL"><path d="M62 92 C40 78 30 60 34 50 C44 62 52 64 60 66 C54 74 56 84 62 92 Z" fill="#b08cff"/></g><g class="m-flapR"><path d="M108 92 C130 78 140 60 136 50 C126 62 118 64 110 66 C116 74 114 84 108 92 Z" fill="#b08cff"/></g><path d="M104 128 C122 132 132 124 138 112" fill="none" stroke="#ffd166" stroke-width="7" stroke-linecap="round"/><g class="m-bob"><ellipse cx="85" cy="106" rx="25" ry="30" fill="#ffd166"/><ellipse cx="85" cy="112" rx="14" ry="20" fill="#fff0c2"/><path d="M76 104 h18 M75 114 h20 M77 124 h16" stroke="#e9b84a" stroke-width="1.5"/><path d="M70 52 L72 40 L80 49 Z M100 52 L98 40 L90 49 Z" fill="#fff6dc"/><circle cx="85" cy="66" r="20" fill="#ffd166"/><circle cx="77" cy="63" r="3.4" fill="#160f1f"/><circle cx="93" cy="63" r="3.4" fill="#160f1f"/><circle cx="78" cy="62" r="1.2" fill="#fff"/><circle cx="94" cy="62" r="1.2" fill="#fff"/><ellipse cx="85" cy="75" rx="9" ry="6" fill="#ffe08a"/><circle cx="82" cy="74" r="1.2" fill="#160f1f"/><circle cx="88" cy="74" r="1.2" fill="#160f1f"/><path d="M80 79 q5 3 10 0" fill="none" stroke="#160f1f" stroke-width="1.6" stroke-linecap="round"/></g><path d="M74 134 l-4 12 M96 134 l4 12" stroke="#ffd166" stroke-width="7" stroke-linecap="round"/>'},
+  zero:{no:7, bg:"#06161c", acc:"#3fc6d1", soft:"#0d2830", ink:"#e6fbff", mute:"#86b6bf", d:"ทุกด้านยังมีที่ให้โต", sk:"ไปได้ไกลที่สุด",
+    m:'<circle class="m-tw" cx="36" cy="58" r="1.8" fill="#e6fbff"/><circle cx="132" cy="50" r="1.8" fill="#e6fbff"/><circle class="m-tw" style="animation-delay:.7s" cx="138" cy="100" r="1.6" fill="#e6fbff"/><g class="m-bob"><g class="m-flapL"><ellipse cx="62" cy="96" rx="9" ry="6" fill="#ffd54f"/></g><g class="m-flapR"><ellipse cx="108" cy="96" rx="9" ry="6" fill="#ffd54f"/></g><circle cx="85" cy="90" r="24" fill="#ffe066"/><circle cx="77" cy="86" r="3" fill="#06161c"/><circle cx="93" cy="86" r="3" fill="#06161c"/><path d="M80 93 l5 5 l5 -5 z" fill="#ff9f43"/><circle cx="71" cy="94" r="3" fill="#ffb3a0" opacity=".8"/><circle cx="99" cy="94" r="3" fill="#ffb3a0" opacity=".8"/><path d="M68 66 l5 -10 l7 8 l5 -9 l5 9 l7 -8 l5 10 Z" fill="#f2f0e6"/></g><path d="M56 104 l7 8 l7 -8 l7 8 l8 -8 l8 8 l7 -8 l7 8 l7 -8 v14 C114 142 56 142 56 118 Z" fill="#f2f0e6"/><path d="M58 128 q27 12 54 0" fill="none" stroke="#c9c6b8" stroke-width="1.5"/>'}
+};
+function archKey(ar){ return Object.keys(ARCH).find(k => ARCH[k] === ar) || "zero"; }
+function cardSVG(k, r, ar, nm){
+  const C = CARD[k] || CARD.zero, F = "'IBM Plex Sans Thai','Thonburi','Leelawadee UI',sans-serif";
+  const bars = r.dom.map((d, i) => { const y = 382 + i * 25, w = Math.round(196 * (d.s || 0) / 100);
+    return `<text x="32" y="${y + 9}" font-size="13" fill="${C.mute}" font-family="${F}">${SHORT[i]}</text><rect x="112" y="${y}" width="196" height="10" rx="5" fill="${C.soft}"/>${d.s != null ? `<rect x="112" y="${y}" width="${Math.max(6, w)}" height="10" rx="5" fill="${d.s < 50 ? "#f5c84b" : C.acc}"/>` : `<text x="210" y="${y + 9}" font-size="10" fill="${C.mute}" text-anchor="middle" font-family="${F}">ไม่ได้ทดสอบ</text>`}`; }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 560" width="340" height="560" role="img" aria-label="การ์ดสาย ${ar.t}">
+<rect x="4" y="4" width="332" height="552" rx="20" fill="${C.bg}" stroke="${C.acc}" stroke-width="4"/>
+${C.tier ? `<rect x="11" y="11" width="318" height="538" rx="15" fill="none" stroke="#b08cff" stroke-width="2"/><rect x="17" y="17" width="306" height="526" rx="11" fill="none" stroke="${C.acc}" stroke-width="1"/>` : C.rare ? `<rect x="14" y="14" width="312" height="532" rx="13" fill="none" stroke="${C.acc}" stroke-width="1.2"/>` : `<rect x="14" y="14" width="312" height="532" rx="13" fill="none" stroke="${C.soft}" stroke-width="1"/>`}
+<text x="28" y="42" font-size="13" letter-spacing="2" fill="${C.acc}" font-family="${F}">No.${String(C.no).padStart(2, "0")}${C.tier ? " · " + C.tier : C.rare ? " · RARE" : ""}</text>
+<rect x="232" y="24" width="84" height="28" rx="14" fill="${C.acc}"/><text x="274" y="43" font-size="14" font-weight="700" text-anchor="middle" fill="${C.bg}" font-family="${F}">${r.overall == null ? "–" : r.overall} / 100</text>
+<circle cx="170" cy="174" r="104" fill="${C.soft}"/><circle cx="170" cy="174" r="104" fill="none" stroke="${C.acc}" stroke-width="1.5" stroke-dasharray="4 8" opacity=".6"/>
+<g transform="translate(0,-10) scale(2)">${C.m}</g>
+<text x="170" y="322" font-size="${ar.t.length > 16 ? 20 : ar.t.length > 12 ? 24 : 27}" font-weight="700" text-anchor="middle" fill="${C.ink}" font-family="${F}">${ar.t}</text>
+<text x="170" y="348" font-size="14" text-anchor="middle" fill="${C.mute}" font-family="${F}">การ์ดของ${nm} · ${C.d}</text>
+${bars}
+<text x="170" y="522" font-size="14" text-anchor="middle" fill="${C.acc}" font-family="${F}">สกิลพิเศษ: ${C.sk}</text>
+<text x="170" y="541" font-size="10.5" letter-spacing="1" text-anchor="middle" fill="${C.mute}" font-family="${F}">เช็กร่างกาย 5 นาที · IG ${COACH.ig}</text>
+</svg>`;
+}
+function cardSection(r, ar){
+  const nm = S.a.name ? esc(S.a.name) : "คุณ";
+  return `<section class="card cardsec">
+    <h2>การ์ดร่างกายของ${nm}</h2>
+    <p class="sub">แถบพลังมาจากคะแนนจริงของคุณ เก็บไว้เทียบตอนทดสอบรอบหน้า หรือแชร์ให้เพื่อนลองบ้าง</p>
+    <div class="pcard">${cardSVG(archKey(ar), r, ar, nm)}</div>
+    <button class="btn btn-ig" id="savecard" type="button" style="width:100%;margin-top:12px">แชร์การ์ดลงสตอรี่ IG</button>
+    <div id="cardout"></div>
+  </section>`;
+}
+const SHARE_URL = "https://fupichaya.github.io/";
+function copyLink(){
+  const done = () => { const b = $("#copylink"); if(b) b.textContent = "คัดลอกแล้ว ✓"; };
+  try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(SHARE_URL).then(done, fallback); return; } }catch(e){}
+  fallback();
+  function fallback(){ try{ const ta = document.createElement("textarea"); ta.value = SHARE_URL; ta.setAttribute("readonly", ""); ta.style.cssText = "position:absolute;left:-9999px"; document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, 99999); document.execCommand("copy"); ta.remove(); done(); }catch(e){} }
+}
+function openIgStory(){
+  const u = "instagram://story-camera";
+  try{ window.top.location.href = u; }catch(e){ try{ window.open(u, "_blank"); }catch(e2){ location.href = u; } }
+}
+async function saveCard(){
+  const out = $("#cardout"), btn = $("#savecard");
+  try{
+    btn.disabled = true; btn.textContent = "กำลังสร้างรูป…";
+    const r = compute(), ar = archetype(r), k = archKey(ar), C = CARD[k] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ";
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const F = "'IBM Plex Sans Thai','Thonburi','Leelawadee UI',sans-serif";
+    const inner = cardSVG(k, r, ar, nm).replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+    const story = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+<defs><pattern id="gr" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M60 0H0V60" fill="none" stroke="${C.soft}" stroke-width="2"/></pattern></defs>
+<rect width="1080" height="1920" fill="${C.bg}"/><rect width="1080" height="1920" fill="url(#gr)"/>
+<text x="540" y="200" text-anchor="middle" font-size="40" font-weight="700" fill="${C.acc}" font-family="${F}">ร่างกายฉันเป็นสายไหน?</text>
+<g transform="translate(230,250) scale(${(620 / 340).toFixed(5)})">${inner}</g>
+<text x="540" y="1360" text-anchor="middle" font-size="40" font-weight="700" fill="${C.ink}" font-family="${F}">เช็กร่างกาย 5 นาที กับโค้ชฟูจิ</text>
+<text x="540" y="1416" text-anchor="middle" font-size="32" fill="${C.acc}" font-family="${F}">แตะลิงก์ด้านล่าง เปิดการ์ดของคุณ ↓</text></svg>`;
+    const img = new Image();
+    await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(story); });
+    const cv = document.createElement("canvas"); cv.width = 1080; cv.height = 1920;
+    const x = cv.getContext("2d");
+    x.fillStyle = C.bg; x.fillRect(0, 0, 1080, 1920);
+    x.drawImage(img, 0, 0, 1080, 1920);
+    const blob = await new Promise(res => cv.toBlob(res, "image/png"));
+    const file = blob && typeof File === "function" ? new File([blob], "fuji-card.png", {type:"image/png"}) : null;
+    copyLink();
+    let shared = false;
+    if(file && navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:"การ์ดร่างกายของฉัน"}); shared = true; }catch(err){ shared = err && err.name === "AbortError"; }
+    }
+    const steps = `<div class="igsteps"><b>ใส่ลิงก์ให้เพื่อนกดมาทำแบบทดสอบ</b><ol>
+        <li>${shared ? "เลือก Instagram แล้วเลือก “สตอรี่”" : "กดค้างที่รูปด้านล่าง เลือก “บันทึกรูปภาพ” แล้วกดปุ่มเปิด IG สตอรี่ เลือกรูปการ์ด"}</li>
+        <li>กดไอคอนสติกเกอร์ ☺ เลือก “ลิงก์”</li>
+        <li>กดวางลิงก์ (คัดลอกไว้ให้แล้ว) แล้ววางสติกเกอร์ใต้คำว่า “แตะลิงก์ด้านล่าง”</li></ol>
+        <div class="row2"><button class="btn btn-ig" id="openig" type="button">เปิด IG สตอรี่</button><button class="btn" id="copylink" type="button">คัดลอกลิงก์อีกครั้ง</button></div></div>`;
+    out.innerHTML = steps + (shared ? "" : `<img alt="การ์ดร่างกายของคุณ" style="width:100%;border-radius:14px;margin-top:10px" src="${cv.toDataURL("image/png")}">`);
+    out.scrollIntoView({behavior:"smooth", block:"start"});
+  }catch(err){
+    out.innerHTML = `<p class="meta" style="margin-top:10px;text-align:center">สร้างรูปไม่สำเร็จ ลองแคปหน้าจอการ์ดแทนได้เลย</p>`;
+  }finally{ btn.disabled = false; btn.textContent = "แชร์การ์ดลงสตอรี่ IG"; }
+}
+
+/* ---------- views ---------- */
+function viewStart(){
+  const hasDraft = Object.keys(S.a).length > 0;
+  return `
+  <section class="strip">
+    <div class="tag">Fitness check-up · 5 นาที</div>
+    <h1>ร่างกายคุณ<br>เป็น<em>สายไหน</em>?</h1>
+    <svg class="ecg" viewBox="0 0 600 56" preserveAspectRatio="none" aria-hidden="true"><path d="M0 34 H120 L132 34 L140 22 L148 34 H180 L192 6 L204 52 L214 34 H260 L272 26 L284 34 H380 L392 34 L400 22 L408 34 H440 L452 6 L464 52 L474 34 H520 L532 26 L544 34 H600"/></svg>
+    <p class="lead">เล่นแป๊บเดียว 5 นาที ตอบคำถามนิดหน่อย ลองท่าง่ายๆ ที่บ้าน แล้วมาดูกันว่าร่างกายคุณเป็นสายไหน และแข็งแรงแค่ไหนเมื่อเทียบกับคนวัยเดียวกัน</p>
+    <div class="chips"><span class="chip">ความแข็งแรง</span><span class="chip">หัวใจและปอด</span><span class="chip">ความยืดหยุ่น</span><span class="chip">องค์ประกอบร่างกาย</span><span class="chip">ไลฟ์สไตล์</span></div>
+  </section>
+  <section class="card">
+    <h2>เล่นแล้วได้อะไร</h2>
+    <div class="steps-list">
+      <span class="n">01</span><span>คะแนนร่างกายเต็ม 100 ดูว่าด้านไหนเทพ ด้านไหนต้องเติม</span>
+      <span class="n">02</span><span>ฉายาร่างกายของคุณ เอาไปอวดหรือแซวเพื่อนก็ได้</span>
+      <span class="n">03</span><span>ตารางออกกำลังกายลองเริ่ม จัดตามวันที่คุณว่างจริงๆ</span>
+      <span class="n">04</span><span>ลุ้นติด Top 10 ของคนเพศเดียวกันวัยเดียวกัน</span>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn btn-primary" id="go">${hasDraft ? "เล่นต่อจากที่ค้างไว้" : "เริ่มเลย"}</button>
+      ${hasDraft ? `<button class="btn btn-ghost" id="reset">เริ่มใหม่ทั้งหมด</button>` : ""}
+    </div>
+  </section>
+  <section class="card">
+    <span class="example-badge">ตัวอย่างผล</span>
+    <div class="sample">
+      ${radar([72,48,35,70,58], null, 150)}
+      <div>
+        <div class="sub" style="margin:0">ฉายาร่างกาย</div>
+        <h3 style="font-size:22px">ตัวตึงสายแข็ง</h3>
+        <p class="sub">แรงพอใช้ แต่ข้อต่อขยับได้ไม่สุด เสี่ยงปวดหลังและไหล่ถ้าเพิ่มน้ำหนักเร็วเกินไป</p>
+      </div>
+    </div>
+  </section>
+  <p class="fine">ทำเล่นๆ ได้ แต่ทำจริงจะแม่นกว่า · ผลนี้ใช้วางแผนเบื้องต้น ไม่ใช่การวินิจฉัยทางการแพทย์</p>`;
+}
+
+function qHTML(q){
+  const a = S.a, sk = S.skipped[q.id];
+  let h = `<div class="q" id="q-${q.id}">`;
+  const opt = q.note ? ` <span class="opt-note">(${q.note})</span>` : q.optional ? ` <span class="opt-note">(ไม่บังคับ)</span>` : "";
+  if(q.type === "yesno"){
+    h += `<div class="ql">${q.label}</div>`;
+    const v = a.parq || [];
+    q.items.forEach((it,i) => {
+      h += `<div class="yn"><span>${it}</span><span class="pair">
+        <button class="opt" data-yn="${i}" data-v="y" aria-pressed="${v[i]==="y"}">ใช่</button>
+        <button class="opt" data-yn="${i}" data-v="n" aria-pressed="${v[i]==="n"}">ไม่ใช่</button></span></div>`;
+    });
+    return h + `</div>`;
+  }
+  h += `<label class="ql" ${q.type==="num"||q.type==="text" ? `for="in-${q.id}"` : ""}>${q.label}${opt}</label>`;
+  if(q.list) h += `<ul class="gate">${q.list.map(x => `<li>${x}</li>`).join("")}</ul>`;
+  if(q.anim) h += `<div class="demo"><canvas data-anim="${q.anim}" width="400" height="280" aria-label="ภาพเคลื่อนไหวสาธิตท่า"></canvas></div>`;
+  if(q.how) h += `<div class="how">${q.how}</div>`;
+  if(sk){
+    h += `<div class="inrow"><span class="skipped">ข้ามข้อนี้แล้ว</span><button class="skip" data-unskip="${q.id}">กลับมาทำ</button></div></div>`;
+    return h;
+  }
+  if(q.type === "choice" || q.type === "multi"){
+    const cur = a[q.id];
+    if(q.timer) h += `<div class="timer" data-timer="${q.timer}" data-for="${q.id}"><span class="clock num">60</span><button class="btn btn-ghost" data-tstart>เริ่มจับเวลา 60 วิ</button></div>`;
+    h += `<div class="opts ${q.one ? "one" : ""}">` + q.opts.map(([v,l]) => {
+      const on = q.type === "multi" ? (cur || []).includes(v) : cur === v;
+      return `<button class="opt" data-q="${q.id}" data-t="${q.type}" data-v="${v}" aria-pressed="${on}">${l}</button>`;
+    }).join("") + `</div>`;
+  } else if(q.type === "num"){
+    h += `<div class="inrow"><input type="number" inputmode="decimal" id="in-${q.id}" data-in="${q.id}" min="${q.min}" max="${q.max}" value="${nn(a[q.id], "")}">${q.units ? `<span class="seg" role="group" aria-label="หน่วย"><button data-unit="cm" aria-pressed="${unitOf(q.id)==="cm"}">ซม.</button><button data-unit="in" aria-pressed="${unitOf(q.id)==="in"}">นิ้ว</button></span>` : `<span class="unit">${q.unit}</span>`}</div>`;
+    if(q.timer) h += `<div class="timer" data-timer="${q.timer}" data-for="${q.id}"><span class="clock num">${q.timer === "down60" ? "60" : "0"}</span><button class="btn btn-ghost" data-tstart>${q.timer === "down60" ? "เริ่มจับเวลา 60 วิ" : "เริ่มจับเวลา"}</button></div>`;
+  } else if(q.type === "text"){
+    h += `<input type="text" id="in-${q.id}" data-in="${q.id}" placeholder="${q.ph||""}" value="${esc(nn(a[q.id], ""))}" maxlength="30">`;
+  }
+  if(q.skip) h += `<button class="skip" data-skip="${q.id}">ข้ามข้อนี้</button>`;
+  return h + `</div>`;
+}
+
+function viewStep(){
+  const st = STEPS[S.step];
+  const lanes = STEPS.map((_,i) => `<div class="lane ${i <= S.step ? "on" : ""}"></div>`).join("");
+  let warn = "";
+  if(st.id === "test" && compute().parqYes)
+    warn = `<div class="alert">คุณตอบว่ามีข้อที่ตรงในหัวข้อเช็กความพร้อม แนะนำให้ข้ามการทดสอบวิดพื้น แพลงก์ และย่ำเท้ายกเข่า แล้วปรึกษาแพทย์ก่อนเริ่มออกกำลังกายที่หนักขึ้น ถ้าทดสอบแล้วรู้สึกเจ็บหน้าอก เวียนหัว หรือหายใจไม่ทัน ให้หยุดทันที</div>`;
+  return `
+  <div>
+    <div class="lanes" aria-hidden="true">${lanes}</div>
+    <div class="lane-label"><span>ขั้นที่ ${S.step+1} จาก ${STEPS.length}</span><span>${st.title}</span></div>
+  </div>
+  <section class="card">
+    <h2>${st.title}</h2>
+    <p class="sub">${st.sub}</p>
+    ${warn ? `<div style="margin-top:14px">${warn}</div>` : ""}
+    <div style="margin-top:10px">${st.qs.map(qHTML).join("")}</div>
+    <p class="err" id="err" role="alert">${S.err}</p>
+    <div class="row" style="margin-top:8px">
+      <button class="btn btn-ghost" id="back">ย้อนกลับ</button>
+      <button class="btn btn-primary" id="next">${S.step === STEPS.length-1 ? "ดูผลประเมิน" : "ถัดไป"}</button>
+    </div>
+  </section>`;
+}
+
+function validate(){
+  const st = STEPS[S.step], a = S.a;
+  for(const q0 of st.qs){
+    const q = rng(q0);
+    if(q.optional || S.skipped[q.id]) continue;
+    if(q.type === "yesno"){ const v = a.parq || []; if(q.items.some((_,i) => !v[i])) return "ตอบหัวข้อความปลอดภัยให้ครบทุกข้อก่อนนะครับ"; continue; }
+    const v = a[q.id];
+    if(q.type === "multi"){ if(!v || !v.length) return `เลือกคำตอบข้อ “${q.label}” ก่อนนะครับ`; continue; }
+    if(q.skip && (v === undefined || v === "")) return `กรอกข้อ “${q.label}” หรือกด “ข้ามข้อนี้” ก่อนนะครับ`;
+    if(v === undefined || v === "") return `กรอกข้อ “${q.label}” ก่อนนะครับ`;
+    if(q.type === "num"){ const x = Number(v); if(isNaN(x) || x < q.min || x > q.max) return `ค่าข้อ “${q.label}” ควรอยู่ระหว่าง ${q.min}–${q.max} ${q.unit}`; }
+  }
+  if(st.id === "test" && n("push") != null && !c("pushStyle")) return "เลือกแบบวิดพื้นที่ทำ เพื่อให้คิดคะแนนได้ถูกต้อง";
+  // optional fields still need sane values
+  for(const q0 of st.qs){ const q = rng(q0); if(q.type === "num" && q.optional && a[q.id] !== undefined && a[q.id] !== ""){ const x = Number(a[q.id]); if(isNaN(x) || x < q.min || x > q.max) return `ค่าข้อ “${q.label}” ควรอยู่ระหว่าง ${q.min}–${q.max} ${q.unit}`; } }
+  return "";
+}
+
+function ageSection(r){
+  const rows = [];
+  const row = (title, val, lv, col, group, extra, bar) => `<div class="cmp">
+      <div class="cmp-top"><b>${title}</b><span class="pill" style="color:${col}">${lv}</span></div>
+      <div class="cmp-val"><span class="num">${val}</span> <span class="sub" style="margin:0">เทียบกับ${group}</span></div>
+      ${bar || ""}${extra ? `<div class="meta">${extra}</div>` : ""}</div>`;
+  const colFor = q => q >= 3 ? "var(--good)" : q >= 2 ? "var(--warn)" : "var(--bad)";
+  if(r.sqN){ const x = r.sqN;
+    const bar = `<div class="pbar" aria-hidden="true"><i style="left:${x.pct}%"></i><span style="left:25%"></span><span style="left:50%"></span><span style="left:75%"></span></div>`;
+    rows.push(row("ลุกนั่งเก้าอี้ 1 นาที", `${r.sq} ครั้ง`, x.lv, colFor(x.pct >= 75 ? 4 : x.pct >= 50 ? 3 : x.pct >= 25 ? 2 : 1), x.group,
+      `ทำได้มากกว่าประมาณ <b>${x.pct}%</b> ของคนกลุ่มนี้ · ค่ากลาง ${x.med} ครั้ง${x.next ? ` · ${x.next.t} ต้องทำ ${x.next.n} ครั้ง` : ""}`, bar)); }
+  if(r.pushN){ const x = r.pushN, styleTh = {full:"เต็มตัว", knee:"วางเข่า"}[c("pushStyle")];
+    rows.push(row(`วิดพื้น (${styleTh})`, `${n("push")} ครั้ง`, x.lv, colFor(x.i >= 3 ? 4 : x.i >= 2 ? 3 : x.i >= 1 ? 2 : 1), x.group,
+      [x.next ? `${x.next.t} ต้องทำ ${x.next.n} ครั้ง` : "อยู่ระดับสูงสุดของเกณฑ์แล้ว", x.note].filter(Boolean).join(" · "))); }
+  else if(n("push") != null && c("pushStyle")) rows.push(`<div class="cmp"><div class="cmp-top"><b>วิดพื้น</b></div><div class="meta">เกณฑ์ตามอายุใช้กับ${S.a.sex === "f" ? "วิดพื้นวางเข่าหรือเต็มตัว" : "วิดพื้นเต็มตัว"} ข้อนี้จึงคิดคะแนนแบบทั่วไปแทน</div></div>`);
+  if(r.rhrN){ const x = r.rhrN;
+    const warn = r.rhr > 100 ? " · ชีพจรขณะพักเกิน 100 ควรวัดซ้ำ ถ้ายังสูงอยู่ควรปรึกษาแพทย์" : "";
+    rows.push(row("ชีพจรขณะพัก", `${r.rhr} ครั้ง/นาที`, x.lv, colFor(x.i <= 2 ? 4 : x.i <= 4 ? 3 : x.i === 5 ? 2 : 1), x.group,
+      (x.next ? `${x.next.t} ต้องไม่เกิน ${x.next.n} ครั้ง/นาที` : "อยู่ในระดับดีแล้ว") + warn)); }
+  if(!rows.length) return "";
+  return `<section class="card">
+    <h2>เทียบกับคนวัยเดียวกัน</h2>
+    <p class="sub">ดูว่าแต่ละข้อแข็งแรงระดับไหน เมื่อเทียบกับคนเพศและช่วงอายุเดียวกัน</p>
+    <div class="cmps">${rows.join("")}</div>
+    <p class="meta" style="margin-top:12px">ข้อแพลงก์ ก้มแตะเท้า เอื้อมมือไขว้หลัง และย่ำเท้า ยังไม่มีเกณฑ์แยกตามอายุที่เป็นมาตรฐาน จึงใช้เกณฑ์ทั่วไป · เกณฑ์อ้างอิง: ลุกนั่ง 1 นาที จาก Strassmann และคณะ 2013 (ผู้ใหญ่ในสวิตเซอร์แลนด์ 6,926 คน), วิดพื้นจากสมาคมสรีรวิทยาการออกกำลังกายแคนาดา (CSEP), ชีพจรขณะพักจากตารางอ้างอิงที่ใช้ทั่วไป ทั้งหมดเป็นข้อมูลต่างประเทศ ใช้เทียบคร่าวๆ</p>
+  </section>`;
+}
+
+/* ---------- ตารางอันดับ ---------- */
+const BAND_LABEL = {u20:"ต่ำกว่า 20 ปี", "20":"20–29 ปี", "30":"30–39 ปี", "40":"40–49 ปี", "50":"50–59 ปี", "60":"60 ปีขึ้นไป"};
+function bandOf(age){ return age < 20 ? "u20" : String(Math.min(60, Math.floor(age/10)*10)); }
+function deviceId(){
+  try{ let id = localStorage.getItem("fuji-id"); if(!id){ id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("fuji-id", id); } return id; }
+  catch(e){ if(!window.__fid) window.__fid = Math.random().toString(36).slice(2) + Date.now().toString(36); return window.__fid; }
+}
+let LB = {state:"idle", data:null, sex:null, band:null, msg:""};
+function lbEligible(r){ return r.dom[0].s != null && r.dom[1].s != null && r.dom[2].s != null; }
+// คะแนนในตารางอันดับ: ด้านที่ไม่ได้ทดสอบนับเป็น 0 เพื่อความยุติธรรม
+function lbScore(r){ return Math.round(r.dom.reduce((t,d) => t + (d.s || 0), 0) / r.dom.length); }
+// ตารางอันดับทำงานเฉพาะหน้าที่เปิดผ่านลิงก์ Google (QR) เท่านั้น
+const LB_HOST_OK = (() => { try { return !/claude/i.test(location.hostname); } catch(e){ return true; } })();
+function lbSection(r, ar){
+  if(!LEADERBOARD_URL) return "";
+  if(!LB_HOST_OK) return `<section class="card" id="lb"><h2>ตารางอันดับ</h2><p class="sub">ตารางอันดับใช้ได้เมื่อเปิดผ่าน QR หรือลิงก์ของโค้ชฟูจิเท่านั้น หน้านี้เป็นฉบับตัวอย่าง จึงไม่ส่งคะแนนเข้าอันดับ</p></section>`;
+  const mySex = S.a.sex === "f" ? "f" : "m", myBand = bandOf(n("age") || 30);
+  if(!LB.sex){ LB.sex = mySex; LB.band = myBand; }
+  const grp = `${LB.sex === "f" ? "ผู้หญิง" : "ผู้ชาย"} ${BAND_LABEL[LB.band]}`;
+  let form = "";
+  const missing = r.dom.slice(0,3).filter(d => d.s == null).map(d => d.name);
+  form = `<div class="lb-form">
+      <div class="meta">ส่งคะแนน <b>${lbScore(r)}</b> เข้าอันดับให้อัตโนมัติแล้ว ในชื่อ <b>${esc(lbName())}</b> · ขึ้นแค่ชื่อ คะแนนรวม และฉายาร่างกาย ไม่แสดงอายุ น้ำหนัก หรือข้อมูลสุขภาพ</div>
+      ${missing.length ? `<div class="alert">ด้านที่ไม่ได้ทดสอบ (${missing.join(", ")}) นับเป็น 0 ในตารางอันดับ คะแนนอันดับเลยต่ำกว่าคะแนนในหน้านี้ กด “แก้คำตอบ” แล้วกลับไปทำท่าที่ข้ามไว้ อันดับจะขยับขึ้นเอง</div>` : ""}
+      <div class="inrow"><input type="text" id="lb-name" maxlength="20" value="${esc(S.lbName || S.a.name || "")}" placeholder="${esc(lbAlias())}" aria-label="ชื่อที่แสดงในอันดับ"><button class="btn btn-ghost" id="lb-send" style="min-height:46px">เปลี่ยนชื่อ</button></div>
+    </div>`;
+  let board = "";
+  if(LB.state === "loading") board = `<p class="meta">กำลังโหลดอันดับ…</p>`;
+  else if(LB.state === "error") board = `<div class="alert">${LB.msg || "โหลดอันดับไม่สำเร็จ"} <button class="skip" id="lb-retry">ลองใหม่</button></div>`;
+  else if(LB.state === "ok" && LB.data){
+    const d = LB.data;
+    const me = d.me && LB.sex === mySex && LB.band === myBand ? `<div class="lb-me">คุณอยู่อันดับ <b class="num">${d.me.rank}</b> จาก <span class="num">${d.total}</span> คน</div>` : "";
+    board = me + (d.top.length ? `<ol class="lb-list">${d.top.map(t => `<li class="${t.me ? "me" : ""}"><span class="rk num">${t.rank}</span><span class="nm">${esc(t.name)}<small>${esc(t.type || "")}</small></span><span class="sc num">${t.score}</span></li>`).join("")}</ol>`
+      : `<p class="meta">ยังไม่มีใครในกลุ่มนี้ เป็นคนแรกเลย</p>`);
+  }
+  const sel = (id, opts, cur) => `<select id="${id}" class="lb-sel">${opts.map(([v,l]) => `<option value="${v}" ${v === cur ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+  return `<section class="card" id="lb">
+    <h2>ตารางอันดับ</h2>
+    <p class="sub">จัดอันดับจากคะแนนรวม แยกตามเพศและช่วงอายุ</p>
+    ${form ? `<div style="margin-top:14px">${form}</div>` : ""}
+    <div class="lb-head">
+      <span class="ql">Top 10 · ${grp}</span>
+      <span class="lb-pick">${sel("lb-sex", [["m","ผู้ชาย"],["f","ผู้หญิง"]], LB.sex)}${sel("lb-band", Object.entries(BAND_LABEL), LB.band)}</span>
+    </div>
+    ${board}
+  </section>`;
+}
+function lbFetch(opts){
+  const ctl = ("AbortController" in window) ? new AbortController() : null;
+  const timer = setTimeout(() => ctl && ctl.abort(), 12000);
+  return fetch(opts.url, Object.assign({signal: ctl ? ctl.signal : undefined}, opts.init || {}))
+    .then(res => { if(!res.ok) throw new Error("http " + res.status); return res.json(); })
+    .finally(() => clearTimeout(timer));
+}
+function logCompletion(){
+  // บันทึกสถิติแบบไม่ระบุตัวตน 1 ครั้งต่อชุดคำตอบ
+  if(!LEADERBOARD_URL) return;
+  const sig = JSON.stringify([S.a, S.skipped]);
+  if(S.loggedSig === sig) return;
+  const r = compute(); if(r.overall == null) return;
+  const body = {kind:"log", id: deviceId(), sex: S.a.sex === "f" ? "f" : "m", band: bandOf(n("age") || 30), goal: S.a.goal || "", score: r.overall, type: archetype(r).t};
+  lbFetch({url: LEADERBOARD_URL, init: {method: "POST", body: JSON.stringify(body)}})
+    .then(d => { if(d && d.ok){ S.loggedSig = sig; save(); } })
+    .catch(() => {});
+}
+function lbRender(){ const el = $("#lb"); if(!el) return; const r = compute(); const tmp = document.createElement("div"); tmp.innerHTML = lbSection(r, archetype(r)); el.replaceWith(tmp.firstElementChild); }
+function lbLoad(){
+  if(!LEADERBOARD_URL) return;
+  LB.state = "loading"; lbRender();
+  const q = `?sex=${encodeURIComponent(LB.sex)}&band=${encodeURIComponent(LB.band)}&id=${encodeURIComponent(deviceId())}`;
+  lbFetch({url: LEADERBOARD_URL + q})
+    .then(d => { if(d.error) throw new Error(d.error); LB.state = "ok"; LB.data = d; lbRender(); })
+    .catch(() => { LB.state = "error"; LB.msg = "โหลดอันดับไม่สำเร็จ ตรวจสัญญาณเน็ตแล้วลองใหม่"; lbRender(); });
+}
+function lbAlias(){ return "ผู้เล่น #" + deviceId().slice(-4).toUpperCase(); }
+function lbName(){ return (S.lbName || S.a.name || "").trim() || lbAlias(); }
+function lbSend(rename){
+  if(rename){ const v = ($("#lb-name").value || "").trim(); S.lbName = v; }
+  const r = compute(), ar = archetype(r);
+  if(r.overall == null) return;
+  const body = {id: deviceId(), name: lbName(), sex: S.a.sex === "f" ? "f" : "m", band: bandOf(n("age") || 30), score: lbScore(r), type: ar.t};
+  const sig = JSON.stringify(body);
+  LB.sex = body.sex; LB.band = body.band; LB.state = "loading"; lbRender();
+  lbFetch({url: LEADERBOARD_URL, init: {method: "POST", body: JSON.stringify(body)}})
+    .then(d => { if(d.error) throw new Error(d.error); S.lbDone = true; S.lbSig = sig; save(); LB.state = "ok"; LB.data = d; lbRender(); })
+    .catch(() => { LB.state = "error"; LB.msg = "ส่งคะแนนเข้าอันดับไม่สำเร็จ ตรวจสัญญาณเน็ตแล้วกดลองใหม่"; lbRender(); });
+}
+function lbAuto(){
+  const r = compute(); if(r.overall == null) return false;
+  const sig = JSON.stringify({id: deviceId(), name: lbName(), sex: S.a.sex === "f" ? "f" : "m", band: bandOf(n("age") || 30), score: lbScore(r), type: archetype(r).t});
+  if(S.lbSig === sig) return false;
+  lbSend(false); return true;
+}
+
+function summaryText(r, ar){
+  const nm = S.a.name ? S.a.name : "ผู้ทำแบบประเมิน";
+  const goalL = (STEPS[1].qs[0].opts.find(o => o[0] === S.a.goal) || [0, "-"])[1];
+  const lines = [`ผลเช็กร่างกาย 5 นาที: ${nm}`, `เพศ ${S.a.sex === "f" ? "หญิง" : "ชาย"} อายุ ${S.a.age} ปี`, `เป้าหมาย: ${goalL}`,
+    `คะแนนรวม: ${nn(r.overall, "-")} / 100 (${levelOf(r.overall).t})`, `ร่างกายสาย: ${ar.t}`];
+  r.dom.forEach(d => lines.push(`- ${d.name}: ${nn(d.s, "ไม่ได้ทดสอบ")}`));
+  if(r.sqN) lines.push(`ลุกนั่ง 1 นาที ${r.sq} ครั้ง: ${r.sqN.lv} (มากกว่า ~${r.sqN.pct}% ของ${r.sqN.group})`);
+  if(r.pushN) lines.push(`วิดพื้น ${n("push")} ครั้ง: ${r.pushN.lv} (${r.pushN.group})`);
+  if(r.rhrN) lines.push(`ชีพจรขณะพัก ${r.rhr}: ${r.rhrN.lv} (${r.rhrN.group})`);
+  if(r.bmi) lines.push(`BMI ${r.bmi.toFixed(1)}${r.whr ? ` · รอบเอว/ส่วนสูง ${r.whr.toFixed(2)}` : ""}`);
+  if(r.pain.length) lines.push(`จุดที่ปวดหรือตึง: ${r.pain.map(p => STEPS[3].qs[1].opts.find(o => o[0] === p)[1]).join(", ")}`);
+  if(r.parqYes) lines.push(`เช็กความพร้อม: มีข้อที่ตรงอย่างน้อย 1 ข้อ`);
+  lines.push(`ว่าง ${S.a.days === "5" ? "5+" : S.a.days} วัน/สัปดาห์ ครั้งละ ${S.a.mins} นาที`);
+  lines.push(`ส่งให้${COACH.name} · LINE: ${COACH.line} · IG: ${COACH.ig}`);
+  return lines.join("\n");
+}
+
+function viewResult(){
+  const r = compute(), ar = archetype(r), lv = levelOf(r.overall), pl = plan(r), wk = pl.days, ms = missions(), helps = coachHelps(r);
+  const nm = S.a.name ? esc(S.a.name) : "คุณ";
+  const metaFor = k => {
+    if(k === "body" && r.bmi) return `BMI ${r.bmi.toFixed(1)} (เกณฑ์คนเอเชีย ปกติ 18.5–22.9)${r.whr ? ` · รอบเอว/ส่วนสูง ${r.whr.toFixed(2)} (ควรต่ำกว่า 0.5)` : ""}`;
+    if(k === "life") return "การนอน ความเครียด การนั่ง การขยับ และโปรตีน";
+    if(k === "strength") return "ลุกนั่งเก้าอี้ วิดพื้น แพลงก์";
+    if(k === "cardio") return "ย่ำเท้ายกเข่า 1 นาที ชีพจรขณะพัก และกิจกรรมต่อสัปดาห์";
+    if(k === "flex") return "ก้มแตะเท้า และเอื้อมมือไขว้หลัง";
+    return "";
+  };
+  const doms = r.dom.map(d => { const l = levelOf(d.s);
+    return `<div class="dom"><b>${d.name}</b><span class="pill" style="color:${l.col}">${d.s == null ? "ไม่ได้ทดสอบ" : `<span class="num">${d.s}</span> · ${l.t}`}</span>
+      <div class="bar"><i style="width:${d.s || 0}%;background:${l.col}"></i></div><div class="meta">${metaFor(d.k)}</div></div>`; }).join("");
+  const safety = r.parqYes ? `<div class="alert"><b>ก่อนเริ่ม:</b> คุณมีข้อที่ตรงในหัวข้อเช็กความพร้อม ควรปรึกษาแพทย์ก่อนเริ่มโปรแกรมที่หนักขึ้น ตารางด้านล่างปรับเป็นความหนักต่ำถึงปานกลางให้แล้ว</div>` : "";
+  const contact = [COACH.line ? `LINE: ${esc(COACH.line)}` : "", COACH.ig ? `IG: ${esc(COACH.ig)}` : ""].filter(Boolean).join(" · ");
+  return `
+  <section class="strip">
+    <div class="report-head">
+      <div>
+        <div class="tag">ผลประเมินของ${nm}</div>
+        <div class="score-big num" style="margin-top:8px">${nn(r.overall, "–")}<small> /100</small></div>
+        <span class="level" style="background:${lv.col}">${lv.t}</span>
+      </div>
+    </div>
+    <div class="radar-box">${radar(r.dom.map(d => d.s), SHORT, 260)}</div>
+    <div class="archetype" style="background:var(--card)">
+      <div class="k">ฉายาร่างกายคุณ</div>
+      <h3>${ar.t}</h3>
+      <p style="margin-top:6px">${ar.d}</p>
+    </div>
+  </section>
+  ${safety}
+  ${cardSection(r, ar)}
+  <section class="card">
+    <h2>คะแนนแต่ละด้าน</h2>
+    <p class="sub">0–100 เทียบกับเกณฑ์ทั่วไปตามเพศและวัย</p>
+    <div class="domains" style="margin-top:14px">${doms}</div>
+  </section>
+  ${ageSection(r)}
+  <section class="card">
+    <h2>ถ้าเริ่มพรุ่งนี้ เริ่ม 3 อย่างนี้</h2>
+    <ul class="clean">${ar.p.map(x => `<li>${x}</li>`).join("")}</ul>
+  </section>
+  <section class="card">
+    <h2>ตารางออกกำลังกาย 1 สัปดาห์ จัดเฉพาะคุณ</h2>
+    <p class="sub">${wk.length} วันต่อสัปดาห์ ครั้งละ ${S.a.mins} นาที ปรับวันได้ตามสะดวก แต่ควรเว้นเวทกลุ่มเดียวกันอย่างน้อย 1 วัน</p>
+    ${pl.why.length ? `<div class="why"><b>ทำไมได้ตารางนี้</b><ul class="clean">${pl.why.map(x => `<li>${x}</li>`).join("")}</ul></div>` : ""}
+    <div class="week">${wk.map((w,i) => `<details class="day" ${i === 0 ? "open" : ""}><summary><span class="d">${w.day}</span><span><b>${w.t}</b><span>${w.s}</span></span></summary>
+      <div class="ex">${w.ex.warm ? `<p class="ex-warm">${w.ex.warm}</p>` : ""}<ol>${w.ex.list.map(exLi).join("")}</ol><p class="ex-note">${w.ex.note}</p>${w.extra.length ? `<div class="extra"><b>เสริมจุดที่ขาด (ท้ายวัน 5 นาที)</b><ol>${w.extra.map(exLi).join("")}</ol></div>` : ""}</div></details>`).join("")}</div>
+    ${ms.length ? `<div class="missions"><b>ภารกิจนอกยิมของคุณ</b><ul class="clean">${ms.map(m => `<li><b>${m[0]}</b> · ${m[1]}</li>`).join("")}</ul></div>` : ""}
+    <p class="meta" style="margin-top:10px">กดที่แต่ละวันเพื่อดูท่า · แตะภาพท่าเพื่อขยาย · ท่าไหนทำแล้วเจ็บให้หยุด ไม่แน่ใจท่าไหนทักโค้ชมาถามได้เลย</p>
+  </section>
+  ${lbSection(r, ar)}
+  <section class="coach">
+    <h2>สวัสดีครับ ผมฟูจิ</h2>
+    <p class="sub" style="margin-top:6px">ผมเป็นเทรนเนอร์ส่วนตัวครับ ถ้ามีคำถามเรื่องออกกำลังกายหรือการกิน ไม่ว่าจะเป็นท่าที่ทำแล้วไม่มั่นใจ ควรเริ่มจากตรงไหน กินยังไงให้เห็นผล หรืออยากคุยเรื่องผลที่ได้วันนี้ ทักมาได้เลยครับ ยินดีตอบ</p>
+    ${contact ? `<p style="margin-top:6px;font-weight:600">${contact}</p>` : ""}
+    <div class="row noprint" style="margin-top:16px">
+      <a class="btn btn-primary" id="copy" href="https://line.me/ti/p/~${encodeURIComponent(COACH.line)}" target="_blank" rel="noopener" style="text-decoration:none">แอด LINE</a>
+      <button class="btn btn-ig" id="ig" type="button">ไปที่ IG</button>
+    </div>
+    <p class="toast" id="toast" aria-live="polite"></p>
+    <textarea class="copybox" id="copybox" readonly aria-label="สรุปผล">${esc(summaryText(r, ar))}</textarea>
+  </section>
+  <div class="row noprint">
+    <button class="btn btn-ghost" id="edit">แก้คำตอบ</button>
+    <button class="btn btn-ghost" id="reset">ให้เพื่อนลองในเครื่องนี้</button>
+  </div>
+  <p class="fine">ผลนี้เป็นการประเมินเบื้องต้นเพื่อวางแผนออกกำลังกาย ไม่ใช่การวินิจฉัยทางการแพทย์ แนะนำให้ทดสอบซ้ำทุก 8 สัปดาห์ · ระบบเก็บสถิติแบบไม่ระบุตัวตน (เพศ ช่วงอายุ เป้าหมาย คะแนนรวม) เพื่อปรับปรุงแบบประเมิน</p>`;
+}
+
+/* ---------- ท่าสาธิต (stick figure, interpolate ระหว่าง 2 ท่า) ---------- */
+const SIDE = [["head","neck"],["neck","sh"],["sh","hip"],["hip","knee"],["knee","ank"],["ank","toe"],["sh","elb"],["elb","hand"]];
+const P = (o) => o;
+const ANIM = {
+  squat:{dur:2000, prop:"chair", segs:SIDE, poses:[
+    P({head:[102,24],neck:[101,34],sh:[101,40],hip:[100,77],knee:[101,104],ank:[100,130],toe:[113,130],elb:[112,54],hand:[104,46]}),
+    P({head:[110,52],neck:[106,62],sh:[104,67],hip:[80,100],knee:[106,104],ank:[100,130],toe:[113,130],elb:[116,80],hand:[108,72]})]},
+  push_full:{dur:1800, segs:SIDE, poses:[
+    P({head:[163,90],neck:[156,95],sh:[150,98],hip:[95,110],knee:[62,120],ank:[30,127],toe:[24,130],elb:[150,114],hand:[150,130]}),
+    P({head:[162,112],neck:[154,116],sh:[148,119],hip:[95,124],knee:[62,127],ank:[30,128],toe:[24,130],elb:[136,113],hand:[150,130]})]},
+  push_knee:{dur:1800, segs:SIDE, poses:[
+    P({head:[163,90],neck:[156,95],sh:[150,98],hip:[112,114],knee:[80,130],ank:[56,120],toe:[50,114],elb:[150,114],hand:[150,130]}),
+    P({head:[162,112],neck:[154,116],sh:[148,119],hip:[112,126],knee:[80,130],ank:[56,120],toe:[50,114],elb:[136,113],hand:[150,130]})]},
+  push_wall:{dur:1800, prop:"wall", segs:SIDE, poses:[
+    P({head:[136,30],neck:[130,38],sh:[126,44],hip:[100,82],knee:[86,106],ank:[72,130],toe:[84,130],elb:[148,52],hand:[170,46]}),
+    P({head:[150,34],neck:[143,42],sh:[139,48],hip:[108,84],knee:[90,107],ank:[72,130],toe:[84,130],elb:[150,66],hand:[170,46]})]},
+  plank:{dur:2600, segs:SIDE, poses:[
+    P({head:[164,100],neck:[156,105],sh:[150,108],hip:[95,113],knee:[62,120],ank:[30,127],toe:[24,130],elb:[150,130],hand:[172,130]}),
+    P({head:[164,99],neck:[156,104],sh:[150,107],hip:[95,111],knee:[62,119],ank:[30,127],toe:[24,130],elb:[150,130],hand:[172,130]})]},
+  toe:{dur:3000, segs:SIDE, poses:[
+    P({head:[101,24],neck:[100,34],sh:[100,40],hip:[100,77],knee:[100,104],ank:[100,130],toe:[113,130],elb:[102,58],hand:[103,75]}),
+    P({head:[134,104],neck:[128,96],sh:[124,92],hip:[93,78],knee:[99,104],ank:[100,130],toe:[113,130],elb:[124,110],hand:[116,128]})]},
+  reach:{dur:2600, segs:[["head","neck"],["neck","shL"],["neck","shR"],["shL","hipL"],["shR","hipR"],["hipL","hipR"],["hipL","kneeL"],["kneeL","ankL"],["hipR","kneeR"],["kneeR","ankR"],["shR","elbR"],["elbR","handR"],["shL","elbL"],["elbL","handL"]], poses:[
+    P({head:[100,24],neck:[100,40],shL:[82,44],shR:[118,44],hipL:[90,92],hipR:[110,92],kneeL:[89,112],ankL:[88,132],kneeR:[111,112],ankR:[112,132],elbR:[116,16],handR:[104,50],elbL:[74,80],handL:[95,84]}),
+    P({head:[100,24],neck:[100,40],shL:[82,44],shR:[118,44],hipL:[90,92],hipR:[110,92],kneeL:[89,112],ankL:[88,132],kneeR:[111,112],ankR:[112,132],elbR:[116,18],handR:[101,63],elbL:[76,82],handL:[99,68]})]},
+  march:{dur:900, segs:[["head","neck"],["neck","sh"],["sh","hip"],["hip","kneeA"],["kneeA","ankA"],["hip","kneeB"],["kneeB","ankB"],["sh","elbA"],["elbA","handA"],["sh","elbB"],["elbB","handB"]], poses:[
+    P({head:[101,24],neck:[100,34],sh:[100,40],hip:[100,77],kneeA:[121,74],ankA:[116,101],kneeB:[100,104],ankB:[100,130],elbA:[91,56],handA:[86,71],elbB:[110,55],handB:[119,47]}),
+    P({head:[101,24],neck:[100,34],sh:[100,40],hip:[100,77],kneeA:[100,104],ankA:[100,130],kneeB:[121,74],ankB:[116,101],elbA:[110,55],handA:[119,47],elbB:[91,56],handB:[86,71]})]}
+};
+/* ---------- ท่าตัวอย่างในตาราง (หุ่นเส้น) ---------- */
+const EXANIMS = (() => {
+// segment sets
+const SIDE = [["head","neck"],["neck","sh"],["sh","hip"],["hip","knee"],["knee","ank"],["ank","toe"],["sh","elb"],["elb","hand"]];
+const SIDE2 = [["head","neck"],["neck","sh"],["sh","hip"],["hip","kA"],["kA","aA"],["aA","tA"],["hip","kB"],["kB","aB"],["aB","tB"],["sh","eA"],["eA","hA"],["sh","eB"],["eB","hB"]];
+const FRONT = [["head","neck"],["neck","shL"],["neck","shR"],["shL","hipL"],["shR","hipR"],["hipL","hipR"],["hipL","kL"],["kL","aL"],["hipR","kR"],["kR","aR"],["shL","eL"],["eL","hL"],["shR","eR"],["eR","hR"]];
+const QUAD = [["head","neck"],["neck","sh"],["sh","mid"],["mid","hip"],["hip","kA"],["kA","aA"],["aA","tA"],["hip","kB"],["kB","aB"],["aB","tB"],["sh","eA"],["eA","hA"],["sh","eB"],["eB","hB"]];
+const STAND = {head:[101,24],neck:[100,34],sh:[100,40],hip:[100,76],knee:[100,103],ank:[100,130],toe:[112,130],elb:[102,58],hand:[103,74]};
+const STAND2 = {head:[101,24],neck:[100,34],sh:[100,40],hip:[100,76],kA:[101,103],aA:[100,130],tA:[112,130],kB:[99,103],aB:[98,130],tB:[110,130],eA:[103,58],hA:[104,74],eB:[98,58],hB:[97,74]};
+const FSTAND = {head:[100,22],neck:[100,33],shL:[86,40],shR:[114,40],hipL:[92,78],hipR:[108,78],kL:[91,104],aL:[90,130],kR:[109,104],aR:[110,130],eL:[82,58],hL:[80,76],eR:[118,58],hR:[120,76]};
+const M = (base, o) => Object.assign({}, base, o);
+const SUPINE = {head:[34,117],neck:[44,121],sh:[52,124],hip:[88,124]};
+const QBASE = {head:[146,88],neck:[138,93],sh:[130,96],mid:[110,96],hip:[90,96],kA:[91,123],aA:[66,127],tA:[60,124],kB:[89,123],aB:[64,127],tB:[58,124],eA:[131,112],hA:[131,128],eB:[129,112],hB:[129,128]};
+const A = {
+ squat:{dur:2000,prop:"chair",segs:SIDE,poses:[STAND, M(STAND,{head:[110,52],neck:[106,62],sh:[104,67],hip:[80,100],knee:[106,104],elb:[116,80],hand:[108,72]})]},
+ squat_short:{dur:2000,prop:"chair",segs:SIDE,poses:[STAND, M(STAND,{head:[108,40],neck:[104,50],sh:[102,56],hip:[86,90],knee:[108,104],elb:[114,70],hand:[108,62]})]},
+ squat_free:{dur:2000,segs:SIDE,poses:[M(STAND,{elb:[112,52],hand:[124,52]}), M(STAND,{head:[112,52],neck:[107,62],sh:[104,67],hip:[80,100],knee:[106,104],elb:[120,70],hand:[136,70]})]},
+ jumpsquat:{dur:1500,segs:SIDE,poses:[M(STAND,{head:[112,52],neck:[107,62],sh:[104,67],hip:[80,100],knee:[106,104],elb:[90,82],hand:[82,94]}), M(STAND,{head:[101,6],neck:[100,16],sh:[100,22],hip:[100,58],knee:[101,85],ank:[100,110],toe:[108,118],elb:[92,54],hand:[86,68]})]},
+ push_knee:{dur:1800,segs:SIDE,poses:[{head:[163,90],neck:[156,95],sh:[150,98],hip:[112,114],knee:[80,130],ank:[56,120],toe:[50,114],elb:[150,114],hand:[150,130]},{head:[162,112],neck:[154,116],sh:[148,119],hip:[112,126],knee:[80,130],ank:[56,120],toe:[50,114],elb:[136,113],hand:[150,130]}]},
+ push_full:{dur:1600,segs:SIDE,poses:[{head:[163,90],neck:[156,95],sh:[150,98],hip:[95,110],knee:[62,120],ank:[30,127],toe:[24,130],elb:[150,114],hand:[150,130]},{head:[162,112],neck:[154,116],sh:[148,119],hip:[95,124],knee:[62,127],ank:[30,128],toe:[24,130],elb:[136,113],hand:[150,130]}]},
+ push_wall:{dur:1800,prop:"wall",segs:SIDE,poses:[{head:[136,30],neck:[130,38],sh:[126,44],hip:[100,82],knee:[86,106],ank:[72,130],toe:[84,130],elb:[148,52],hand:[170,46]},{head:[150,34],neck:[143,42],sh:[139,48],hip:[108,84],knee:[90,107],ank:[72,130],toe:[84,130],elb:[150,66],hand:[170,46]}]},
+ plank:{dur:2600,segs:SIDE,poses:[{head:[164,100],neck:[156,105],sh:[150,108],hip:[95,113],knee:[62,120],ank:[30,127],toe:[24,130],elb:[150,130],hand:[172,130]},{head:[164,99],neck:[156,104],sh:[150,107],hip:[95,111],knee:[62,119],ank:[30,127],toe:[24,130],elb:[150,130],hand:[172,130]}]},
+ plank_tap:{dur:1600,segs:SIDE2,poses:[{head:[163,90],neck:[156,95],sh:[150,98],hip:[95,110],kA:[62,120],aA:[30,127],tA:[24,130],kB:[62,121],aB:[30,128],tB:[24,130],eA:[150,114],hA:[150,130],eB:[151,114],hB:[151,130]},{head:[163,90],neck:[156,95],sh:[150,98],hip:[95,110],kA:[62,120],aA:[30,127],tA:[24,130],kB:[62,121],aB:[30,128],tB:[24,130],eA:[150,114],hA:[150,130],eB:[164,106],hB:[152,96]}]},
+ bridge:{dur:2200,segs:SIDE,poses:[M(SUPINE,{knee:[114,104],ank:[128,128],toe:[140,130],elb:[68,128],hand:[84,129]}),M(SUPINE,{hip:[92,104],knee:[118,96],ank:[128,128],toe:[140,130],elb:[68,128],hand:[84,129]})]},
+ bridge1:{dur:2200,segs:SIDE2,poses:[M(SUPINE,{kA:[114,104],aA:[128,128],tA:[140,130],kB:[114,110],aB:[140,100],tB:[146,92],eA:[68,128],hA:[84,129],eB:[68,128],hB:[84,129]}),M(SUPINE,{hip:[92,104],kA:[118,96],aA:[128,128],tA:[140,130],kB:[118,92],aB:[144,84],tB:[150,76],eA:[68,128],hA:[84,129],eB:[68,128],hB:[84,129]})]},
+ row:{dur:2000,segs:SIDE,poses:[{head:[134,48],neck:[128,53],sh:[122,58],hip:[90,74],knee:[100,100],ank:[96,130],toe:[108,130],elb:[124,74],hand:[124,90]},{head:[134,48],neck:[128,53],sh:[122,58],hip:[90,74],knee:[100,100],ank:[96,130],toe:[108,130],elb:[108,64],hand:[114,78]}]},
+ rdl:{dur:2600,segs:SIDE,poses:[STAND,{head:[138,82],neck:[130,82],sh:[124,82],hip:[90,76],knee:[98,103],ank:[100,130],toe:[112,130],elb:[124,98],hand:[124,113]}]},
+ deadbug:{dur:2400,segs:SIDE2,poses:[M(SUPINE,{kA:[112,118],aA:[138,121],tA:[142,113],kB:[100,100],aB:[124,100],tB:[126,92],eA:[54,108],hA:[56,92],eB:[38,114],hB:[22,110]}),M(SUPINE,{kB:[112,118],aB:[138,121],tB:[142,113],kA:[100,100],aA:[124,100],tA:[126,92],eB:[54,108],hB:[56,92],eA:[38,114],hA:[22,110]})]},
+ stepup:{dur:2000,prop:"box",segs:SIDE2,poses:[{head:[94,30],neck:[93,40],sh:[92,46],hip:[88,80],kA:[110,86],aA:[118,112],tA:[130,112],kB:[90,106],aB:[88,130],tB:[100,130],eA:[96,64],hA:[98,80],eB:[90,64],hB:[88,80]},{head:[120,12],neck:[119,22],sh:[118,28],hip:[116,62],kA:[119,88],aA:[118,112],tA:[130,112],kB:[114,88],aB:[112,112],tB:[124,112],eA:[121,46],hA:[122,62],eB:[116,46],hB:[115,62]}]},
+ calf:{dur:1600,segs:SIDE,poses:[STAND,{head:[101,14],neck:[100,24],sh:[100,30],hip:[100,66],knee:[100,93],ank:[101,119],toe:[112,130],elb:[102,48],hand:[103,64]}]},
+ press:{dur:2000,segs:SIDE,poses:[M(STAND,{elb:[110,52],hand:[106,38]}),M(STAND,{elb:[103,22],hand:[102,6]})]},
+ curl:{dur:1800,segs:SIDE,poses:[M(STAND,{elb:[102,58],hand:[104,74]}),M(STAND,{elb:[102,58],hand:[112,46]})]},
+ pullapart:{dur:2000,segs:FRONT,poses:[M(FSTAND,{eL:[90,52],hL:[98,48],eR:[110,52],hR:[102,48]}),M(FSTAND,{eL:[68,42],hL:[50,42],eR:[132,42],hR:[150,42]})]},
+ lunge:{dur:2400,segs:SIDE2,poses:[STAND2,{head:[96,46],neck:[96,56],sh:[96,62],hip:[96,98],kA:[120,100],aA:[118,130],tA:[130,130],kB:[86,125],aB:[62,124],tB:[56,130],eA:[98,80],hA:[100,96],eB:[94,80],hB:[92,96]}]},
+ birddog:{dur:2600,segs:QUAD,poses:[QBASE,M(QBASE,{eA:[146,92],hA:[162,90],kB:[64,96],aB:[38,96],tB:[32,90]})]},
+ catcow:{dur:2800,segs:QUAD,poses:[M(QBASE,{mid:[110,104],head:[147,84],neck:[139,90]}),M(QBASE,{mid:[110,84],head:[142,104],neck:[136,100]})]},
+ sidelegraise:{dur:2000,segs:SIDE2,poses:[{head:[30,114],neck:[40,118],sh:[48,121],hip:[84,122],kA:[110,124],aA:[136,126],tA:[140,120],kB:[110,121],aB:[136,122],tB:[140,116],eA:[40,106],hA:[28,104],eB:[64,116],hB:[80,118]},{head:[30,114],neck:[40,118],sh:[48,121],hip:[84,122],kA:[110,124],aA:[136,126],tA:[140,120],kB:[108,108],aB:[132,94],tB:[136,88],eA:[40,106],hA:[28,104],eB:[64,116],hB:[80,118]}]},
+ sideplank:{dur:2400,segs:SIDE,poses:[{head:[50,100],neck:[58,105],sh:[64,108],hip:[98,124],knee:[124,127],ank:[150,128],toe:[152,122],elb:[64,128],hand:[80,128]},{head:[50,94],neck:[58,99],sh:[64,103],hip:[98,110],knee:[124,118],ank:[150,127],toe:[152,121],elb:[64,128],hand:[80,128]}]},
+ wallslide:{dur:2400,segs:FRONT,poses:[M(FSTAND,{eL:[66,44],hL:[66,26],eR:[134,44],hR:[134,26]}),M(FSTAND,{eL:[76,22],hL:[70,6],eR:[124,22],hR:[130,6]})]},
+ chintuck:{dur:2200,segs:SIDE,poses:[M(STAND,{head:[106,22],neck:[102,33]}),M(STAND,{head:[98,23],neck:[99,33]})]},
+ hipflexor:{dur:3000,segs:SIDE2,poses:[{head:[97,50],neck:[96,60],sh:[96,66],hip:[96,102],kA:[122,104],aA:[122,130],tA:[134,130],kB:[88,128],aB:[62,128],tB:[56,124],eA:[110,82],hA:[120,98],eB:[106,84],hB:[118,100]},{head:[111,54],neck:[109,64],sh:[107,70],hip:[104,106],kA:[124,104],aA:[122,130],tA:[134,130],kB:[88,128],aB:[62,128],tB:[56,124],eA:[118,86],hA:[124,100],eB:[116,88],hB:[122,102]}]},
+ quadstretch:{dur:2800,prop:"wall",segs:SIDE2,poses:[M(STAND2,{eA:[124,46],hA:[150,40]}),M(STAND2,{eA:[124,46],hA:[150,40],kB:[100,104],aB:[82,92],tB:[78,84],eB:[90,64],hB:[82,90]})]},
+ openbook:{dur:3000,segs:SIDE2,poses:[{head:[30,114],neck:[40,118],sh:[48,121],hip:[84,122],kA:[104,104],aA:[126,116],tA:[134,112],kB:[104,106],aB:[126,118],tB:[134,114],eA:[64,124],hA:[80,124],eB:[64,120],hB:[80,120]},{head:[30,112],neck:[40,117],sh:[48,121],hip:[84,122],kA:[104,104],aA:[126,116],tA:[134,112],kB:[104,106],aB:[126,118],tB:[134,114],eA:[64,124],hA:[80,124],eB:[40,104],hB:[26,96]}]},
+ hamstring:{dur:3000,segs:[...SIDE2,["hA","aB"]],poses:[M(SUPINE,{kA:[114,126],aA:[140,128],tA:[144,122],kB:[108,108],aB:[124,90],tB:[132,84],eA:[66,112],hA:[80,104],eB:[66,112],hB:[80,104]}),M(SUPINE,{kA:[114,126],aA:[140,128],tA:[144,122],kB:[100,100],aB:[106,74],tB:[114,68],eA:[64,108],hA:[76,98],eB:[64,108],hB:[76,98]})]},
+ doorway:{dur:3000,prop:"frame",segs:SIDE,poses:[M(STAND,{elb:[86,40],hand:[84,24]}),M(STAND,{head:[110,26],neck:[107,35],sh:[105,42],hip:[100,77],elb:[90,40],hand:[84,24]})]},
+ hip9090:{dur:3000,segs:FRONT,poses:[{head:[100,72],neck:[100,82],shL:[88,88],shR:[112,88],hipL:[92,124],hipR:[108,124],kL:[72,112],aL:[60,128],kR:[90,106],aR:[78,126],eL:[80,104],hL:[76,122],eR:[120,104],hR:[124,122]},{head:[100,72],neck:[100,82],shL:[88,88],shR:[112,88],hipL:[92,124],hipR:[108,124],kL:[110,106],aL:[122,126],kR:[128,112],aR:[140,128],eL:[80,104],hL:[76,122],eR:[120,104],hR:[124,122]}]},
+ figure4:{dur:3000,segs:SIDE2,poses:[M(SUPINE,{kA:[112,102],aA:[126,128],tA:[138,130],kB:[106,98],aB:[110,106],tB:[118,104],eA:[70,112],hA:[96,108],eB:[70,112],hB:[96,108]}),M(SUPINE,{kA:[98,94],aA:[118,90],tA:[126,84],kB:[96,90],aB:[100,98],tB:[108,96],eA:[66,108],hA:[90,100],eB:[66,108],hB:[90,100]})]},
+ rotation:{dur:1800,segs:FRONT,poses:[M(FSTAND,{shL:[86,42],shR:[112,44],eL:[82,60],hL:[76,72],eR:[98,62],hR:[80,74]}),M(FSTAND,{shL:[88,44],shR:[114,42],eL:[112,46],hL:[132,34],eR:[126,50],hR:[136,36]})]},
+ skater:{dur:1600,segs:FRONT,poses:[{head:[70,30],neck:[72,40],shL:[58,46],shR:[86,48],hipL:[66,82],hipR:[82,84],kL:[64,106],aL:[66,130],kR:[84,108],aR:[60,124],eL:[48,62],hL:[44,78],eR:[96,62],hR:[86,76]},{head:[130,30],neck:[128,40],shL:[114,48],shR:[142,46],hipL:[118,84],hipR:[134,82],kL:[116,108],aL:[140,124],kR:[136,106],aR:[134,130],eL:[104,62],hL:[114,76],eR:[152,62],hR:[156,78]}]},
+ punch:{dur:900,segs:SIDE2,poses:[M(STAND2,{eA:[116,42],hA:[132,40],eB:[108,54],hB:[108,40]}),M(STAND2,{eB:[116,42],hB:[132,40],eA:[108,54],hA:[108,40]})]},
+ march:{dur:900,segs:SIDE2,poses:[{head:[101,24],neck:[100,34],sh:[100,40],hip:[100,77],kA:[121,74],aA:[116,101],tA:[126,104],kB:[100,104],aB:[100,130],tB:[112,130],eA:[91,56],hA:[86,71],eB:[110,55],hB:[119,47]},{head:[101,24],neck:[100,34],sh:[100,40],hip:[100,77],kA:[100,104],aA:[100,130],tA:[112,130],kB:[121,74],aB:[116,101],tB:[126,104],eA:[110,55],hA:[119,47],eB:[91,56],hB:[86,71]}]},
+ walk:{dur:1100,segs:SIDE2,poses:[{head:[103,24],neck:[102,34],sh:[101,40],hip:[100,76],kA:[110,102],aA:[118,128],tA:[130,130],kB:[94,103],aB:[82,126],tB:[90,130],eA:[94,56],hA:[88,70],eB:[108,56],hB:[114,70]},{head:[103,24],neck:[102,34],sh:[101,40],hip:[100,76],kB:[110,102],aB:[118,128],tB:[130,130],kA:[94,103],aA:[82,126],tA:[90,130],eB:[94,56],hB:[88,70],eA:[108,56],hA:[114,70]}]}
+};
+return A;
+})();
+const EX_ANIM = {"สควอตลงนั่งเก้าอี้": "squat", "สควอตลงเก้าอี้ ช่วงสั้นเท่าที่ไม่ปวด": "squat_short", "วิดพื้น (วางเข่าได้)": "push_knee", "ดันกำแพง": "push_wall", "ดันกำแพงแบบกำมือ": "push_wall", "ยกสะโพก (Glute bridge)": "bridge", "ดึงยางยืด / ดัมเบลโรว์": "row", "แพลงก์": "plank", "เดดบั๊ก (Dead bug)": "deadbug", "ก้าวขึ้นลงขั้นบันได": "stepup", "ยืนเขย่งปลายเท้า": "calf", "ดันขวดน้ำหรือดัมเบลขึ้นเหนือหัว": "press", "กางแขนดึงยางยืดระดับอก": "pullapart", "งอแขนยกดัมเบล (Biceps curl)": "curl", "แพลงก์แตะไหล่สลับ": "plank_tap", "แพลงก์วางศอก": "plank", "กางแขนดึงยางยืด (Band pull-apart)": "pullapart", "สควอต (ตัวเปล่าหรือถือดัมเบล)": "squat_free", "ก้าวถอยหลังย่อเข่า (Reverse lunge)": "lunge", "ยกสะโพกขาเดียว": "bridge1", "ก้มหลังตรงถือดัมเบล (Romanian deadlift)": "rdl", "เบิร์ดด็อก (Bird dog)": "birddog", "นอนตะแคงยกขาด้านบน": "sidelegraise", "แพลงก์ด้านข้าง (วางเข่า)": "sideplank", "แพลงก์ด้านข้าง": "sideplank", "ยืนพิงกำแพงเลื่อนแขน (Wall slide)": "wallslide", "เก็บคางเข้า (Chin tuck)": "chintuck", "ยืดสะโพกหน้า (คุกเข่าข้างเดียว)": "hipflexor", "ยืนยืดสะโพกหน้า มือจับผนัง": "quadstretch", "แมว-วัว (Cat-cow)": "catcow", "หมุนตัวช่วงอก (นอนตะแคง)": "openbook", "ยืดหลังต้นขา (นอนหงายใช้ผ้าคล้องเท้า)": "hamstring", "ยืดอกที่ขอบประตู": "doorway", "ยืดอกแขนต่ำ เท่าที่ไม่ปวด": "doorway", "นั่งท่า 90/90 สลับสะโพก": "hip9090", "นอนหงายไขว้ขายืดก้น": "figure4", "กระโดดสควอต (หรือสควอตเร็ว)": "jumpsquat", "ก้าวขึ้นขั้นบันไดเร็ว": "stepup", "สควอตเร็ว ไม่กระโดด": "squat_free", "หมุนตัวเหวี่ยงแขน (ถือขวดน้ำ)": "rotation", "สเก็ตเตอร์ (กระโดดข้าง)": "skater", "ก้าวข้างย่อเข่า": "skater", "วิดพื้นดันเร็ว": "push_full", "ดันกำแพงเร็ว": "push_wall", "วิ่งยกเข่าเร็ว": "march", "ย่ำเท้าเร็ว": "march", "ชกลมเร็ว (ยืนนิ่ง)": "punch", "เดินเร็ว ปั่นจักรยาน หรือวิ่งเบา": "walk", "เร็ว 30 วินาที (วิ่ง ปั่น หรือย่ำเท้ายกเข่า)": "march", "คูลดาวน์เดินช้า": "walk"};
+for(const k in EXANIMS){ if(!(k in ANIM)) ANIM[k] = EXANIMS[k]; }
+let animRaf = null;
+function drawProp(ctx, prop, col){
+  ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath();
+  if(prop === "chair"){ ctx.moveTo(60,100); ctx.lineTo(90,100); ctx.moveTo(62,100); ctx.lineTo(62,130); ctx.moveTo(88,100); ctx.lineTo(88,130); ctx.moveTo(60,100); ctx.lineTo(60,66); }
+  if(prop === "wall"){ ctx.moveTo(172,10); ctx.lineTo(172,130); }
+  if(prop === "box"){ ctx.moveTo(106,130); ctx.lineTo(106,112); ctx.lineTo(152,112); ctx.lineTo(152,130); }
+  if(prop === "frame"){ ctx.moveTo(84,8); ctx.lineTo(84,130); }
+  if(prop === "stairs"){ ctx.moveTo(60,130); ctx.lineTo(96,130); ctx.lineTo(96,116); ctx.lineTo(130,116); ctx.lineTo(130,102); ctx.lineTo(164,102); ctx.lineTo(164,88); ctx.lineTo(196,88); }
+  ctx.stroke();
+}
+function startAnims(){
+  cancelAnimationFrame(animRaf);
+  const cvs = Array.from(document.querySelectorAll("canvas[data-anim]"));
+  if(!cvs.length) return;
+  const cs = getComputedStyle(document.documentElement);
+  const ink = cs.getPropertyValue("--ink").trim() || "#10261c", acc = cs.getPropertyValue("--accent").trim() || "#0e8a5a", line = cs.getPropertyValue("--muted").trim() || "#888";
+  const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const frame = (now) => {
+    cvs.forEach(cv => {
+      if(!cv.offsetParent) return;
+      let key = cv.dataset.anim;
+      if(key === "push") key = "push_" + (S.a.pushStyle || "full");
+      const A = ANIM[key]; if(!A) return;
+      const ctx = cv.getContext("2d"), sc = cv.width / 200;
+      ctx.setTransform(sc,0,0,sc,0,0); ctx.clearRect(0,0,200,140);
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.strokeStyle = line; ctx.globalAlpha = .5; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(8,131.5); ctx.lineTo(192,131.5); ctx.stroke(); ctx.globalAlpha = 1;
+      if(A.prop) drawProp(ctx, A.prop, line);
+      // หลายท่า: วนจากท่าที่ 1 ไปท่าถัดไปแบบนุ่มนวล
+      const P = A.poses.length, cyc = still ? 0.25 : ((now % A.dur) / A.dur) * (P === 2 ? 1 : P);
+      let a, b, ph;
+      if(P === 2){ a = A.poses[0]; b = A.poses[1]; ph = (1 - Math.cos(cyc * 2 * Math.PI)) / 2; }
+      else { const i = Math.floor(cyc) % P; a = A.poses[i]; b = A.poses[(i+1) % P]; ph = (1 - Math.cos((cyc - Math.floor(cyc)) * Math.PI)) / 2; }
+      const pt = {};
+      for(const k in a){ pt[k] = [a[k][0] + (b[k][0]-a[k][0])*ph, a[k][1] + (b[k][1]-a[k][1])*ph]; }
+      ctx.strokeStyle = acc; ctx.lineWidth = 6;
+      A.segs.forEach(([p,q]) => { ctx.beginPath(); ctx.moveTo(...pt[p]); ctx.lineTo(...pt[q]); ctx.stroke(); });
+      ctx.fillStyle = acc; ctx.beginPath(); ctx.arc(pt.head[0], pt.head[1], 9, 0, Math.PI*2); ctx.fill();
+    });
+    if(!still) animRaf = requestAnimationFrame(frame);
+  };
+  animRaf = requestAnimationFrame(frame);
+}
+
+/* ---------- เสียง (สังเคราะห์ด้วย Web Audio ไม่ต้องโหลดไฟล์) ---------- */
+let AC = null, soundOn = true;
+try{ soundOn = localStorage.getItem("fuji-sound") !== "off"; }catch(e){}
+function ac(){ try{ if(!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if(AC.state === "suspended") AC.resume(); }catch(e){ AC = null; } return AC; }
+function tone(freq, dur, opt){
+  if(!soundOn) return; const a = ac(); if(!a) return;
+  opt = opt || {}; const t = a.currentTime + (opt.at || 0);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = opt.type || "sine"; o.frequency.setValueAtTime(freq, t);
+  if(opt.slide) o.frequency.exponentialRampToValueAtTime(opt.slide, t + dur);
+  const v = opt.vol || 0.18;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const SFX = {
+  tap(){ tone(880, 0.06, {type:"triangle", vol:0.08}); },
+  next(){ tone(520, 0.08, {type:"triangle", vol:0.1}); tone(780, 0.1, {type:"triangle", vol:0.1, at:0.07}); },
+  back(){ tone(600, 0.08, {type:"triangle", vol:0.08, slide:420}); },
+  err(){ tone(220, 0.16, {type:"square", vol:0.06}); tone(180, 0.2, {type:"square", vol:0.06, at:0.14}); },
+  start(){ tone(660, 0.12, {vol:0.2}); tone(990, 0.22, {vol:0.22, at:0.13}); },
+  tick(){ tone(1200, 0.07, {type:"square", vol:0.07}); },
+  count(){ tone(880, 0.14, {vol:0.22}); },
+  lap(){ tone(1320, 0.09, {vol:0.12}); },
+  end(){ [0,0.18,0.36].forEach((d,i) => tone(1046, i === 2 ? 0.6 : 0.14, {vol:0.25, at:d})); },
+  stop(){ tone(990, 0.1, {vol:0.18}); tone(660, 0.18, {vol:0.18, at:0.1}); },
+  result(){ [523,659,784,1046].forEach((f,i) => tone(f, i === 3 ? 0.7 : 0.18, {type:"triangle", vol:0.16, at:i*0.12})); },
+  skip(){ tone(500, 0.07, {type:"triangle", vol:0.07, slide:350}); }
+};
+function syncSoundBtn(){ const b = $("#sound"); if(b){ b.setAttribute("aria-pressed", soundOn); b.textContent = soundOn ? "เสียง: เปิด" : "เสียง: ปิด"; } }
+
+/* ---------- พลุฉลองตอนเปิดผล ---------- */
+function confetti(){
+  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const cv = document.createElement("canvas");
+  cv.style.cssText = "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50";
+  document.body.appendChild(cv);
+  const W = cv.width = innerWidth * (devicePixelRatio || 1), H = cv.height = innerHeight * (devicePixelRatio || 1);
+  const ctx = cv.getContext("2d"), cols = ["#3fd18f","#0e8a5a","#c9f2dc","#e5b13a","#ffffff"];
+  const ps = Array.from({length: 120}, () => ({x: W/2 + (Math.random()-.5)*W*.2, y: H*.35, vx: (Math.random()-.5)*W*.018, vy: -Math.random()*H*.022 - H*.006,
+    w: 6 + Math.random()*8, h: 4 + Math.random()*6, r: Math.random()*6, vr: (Math.random()-.5)*.3, c: cols[(Math.random()*cols.length)|0]}));
+  const t0 = performance.now();
+  (function f(now){
+    const t = now - t0; ctx.clearRect(0,0,W,H);
+    ps.forEach(p => { p.vy += H*.0009; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.globalAlpha = Math.max(0, 1 - t/1800); ctx.fillStyle = p.c; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
+    if(t < 1800) requestAnimationFrame(f); else cv.remove();
+  })(t0);
+}
+
+/* ---------- render & events ---------- */
+let tick = null;
+function render(){
+  clearInterval(tick); tick = null;
+  const app = $("#app");
+  try{ app.innerHTML = S.view === "start" ? viewStart() : S.view === "step" ? viewStep() : viewResult(); }
+  catch(err){ // ข้อมูลเก่าในเครื่องพัง: เริ่มใหม่แทนที่จะเป็นหน้าว่าง
+    S = {view:"start", step:0, a:{}, skipped:{}, err:""}; app.innerHTML = viewStart(); }
+  save(); startAnims();
+  if(S.view === "result" && LEADERBOARD_URL && LB_HOST_OK){ logCompletion(); if(!lbAuto()) lbLoad(); }
+}
+function go(view, step){ S.view = view; if(step != null) S.step = step; S.err = ""; render(); window.scrollTo({top:0, behavior:"instant" in window ? "instant" : "auto"}); }
+
+document.addEventListener("click", e => {
+  const li = e.target.closest(".ex li.has-anim");
+  if(li){ li.classList.toggle("big"); return; }
+  const lk = e.target.closest("a#copy");
+  if(lk){ // คัดลอกผลไว้ แล้วปล่อยให้ลิงก์เปิดหน้าแอด LINE ตามปกติ
+    const txt = $("#copybox").value; SFX.tap();
+    try{ navigator.clipboard.writeText(txt).catch(() => {}); }catch(err){}
+    $("#toast").textContent = "คัดลอกผลไว้แล้ว แอดเพื่อนแล้ววางในแชทได้เลย";
+    return;
+  }
+  const t = e.target.closest("button"); if(!t) return;
+  if(t.id === "savecard"){ saveCard(); return; }
+  if(t.id === "copylink"){ copyLink(); return; }
+  if(t.id === "openig"){ openIgStory(); return; }
+  if(t.id === "ig"){ SFX.tap(); const u = "https://instagram.com/" + encodeURIComponent(COACH.ig); const w = window.open(u, "_blank"); if(!w){ try{ window.top.location.href = u; }catch(err){ location.href = u; } } return; }
+  if(t.id === "sound"){ soundOn = !soundOn; try{ localStorage.setItem("fuji-sound", soundOn ? "on" : "off"); }catch(e){} syncSoundBtn(); if(soundOn) SFX.tap(); return; }
+  if(t.id === "go"){ SFX.next(); return go("step", S.view === "start" && Object.keys(S.a).length ? S.step : 0); }
+  if(t.id === "reset"){ SFX.back(); S = {view:"start", step:0, a:{}, skipped:{}, err:""}; LB = {state:"idle", data:null, sex:null, band:null, msg:""}; return go("start"); }
+  if(t.id === "edit") return go("step", 0);
+  if(t.id === "back"){ SFX.back(); } if(t.id === "back") return S.step === 0 ? go("start") : go("step", S.step - 1);
+  if(t.id === "next"){
+    const m = validate();
+    if(m){ SFX.err(); S.err = m; const el = $("#err"); el.textContent = m; el.scrollIntoView({block:"center"}); return; }
+    if(S.step === STEPS.length - 1){ SFX.result(); go("result"); confetti(); return; }
+    SFX.next(); return go("step", S.step + 1);
+  }
+  if(t.id === "lb-send"){ SFX.tap(); return lbSend(true); }
+  if(t.id === "lb-retry"){ SFX.tap(); return lbAuto() || lbLoad(); }
+  if(t.id === "copy"){
+    const box = $("#copybox"), txt = box.value;
+    SFX.tap(); const done = () => { $("#toast").textContent = `คัดลอกแล้ว ทัก LINE: ${COACH.line} แล้ววางได้เลย`; };
+    try{ navigator.clipboard.writeText(txt).then(done, () => { box.style.display = "block"; box.select(); $("#toast").textContent = "กดค้างที่ข้อความด้านล่างเพื่อคัดลอก"; }); }
+    catch(err){ box.style.display = "block"; box.select(); $("#toast").textContent = "กดค้างที่ข้อความด้านล่างเพื่อคัดลอก"; }
+    return;
+  }
+  if(t.dataset.yn !== undefined){
+    SFX.tap(); const arr = (S.a.parq || []).slice(); arr[Number(t.dataset.yn)] = t.dataset.v; S.a.parq = arr;
+    t.parentElement.querySelectorAll(".opt").forEach(b => b.setAttribute("aria-pressed", b === t));
+    save(); return;
+  }
+  if(t.dataset.q){
+    SFX.tap(); const id = t.dataset.q, v = t.dataset.v;
+    if(t.dataset.t === "multi"){
+      let cur = (S.a[id] || []).slice();
+      if(v === "none") cur = cur.includes("none") ? [] : ["none"];
+      else { cur = cur.filter(x => x !== "none"); cur = cur.includes(v) ? cur.filter(x => x !== v) : cur.concat(v); }
+      S.a[id] = cur;
+      t.parentElement.querySelectorAll(".opt").forEach(b => b.setAttribute("aria-pressed", cur.includes(b.dataset.v)));
+    } else {
+      S.a[id] = v;
+      t.parentElement.querySelectorAll(".opt").forEach(b => b.setAttribute("aria-pressed", b === t));
+    }
+    save(); return;
+  }
+  if(t.dataset.unit){ SFX.tap(); const inp = t.closest(".inrow").querySelector("input"); const id = inp.dataset.in; const old = unitOf(id), nu = t.dataset.unit;
+    if(old !== nu){ const v = Number(S.a[id]); if(S.a[id] !== undefined && S.a[id] !== "" && !isNaN(v)){ S.a[id] = String(Math.round((nu === "in" ? v/2.54 : v*2.54)*10)/10); } S.a[id+"Unit"] = nu; render(); }
+    return; }
+  if(t.dataset.skip){ SFX.skip(); S.skipped[t.dataset.skip] = true; delete S.a[t.dataset.skip]; S.err = ""; return render(); }
+  if(t.dataset.unskip){ delete S.skipped[t.dataset.unskip]; return render(); }
+  if(t.hasAttribute("data-tstart")){
+    const box = t.closest(".timer"), clock = box.querySelector(".clock"), mode = box.dataset.timer, target = box.dataset.for;
+    if(tick){ clearInterval(tick); tick = null; SFX.stop();
+      if(mode === "up"){ const sec = Number(clock.textContent); S.a[target] = String(sec); const inp = $("#in-" + target); if(inp) inp.value = sec; save(); }
+      box.classList.remove("running"); t.textContent = mode === "down60" ? "เริ่มจับเวลา 60 วิ" : "เริ่มจับเวลา"; return; }
+    const t0 = Date.now(); let lastSec = -1; SFX.start(); box.classList.add("running"); box.scrollIntoView({block:"center", behavior:"smooth"});
+    t.textContent = mode === "down60" ? "หยุด" : "หยุดและบันทึกเวลา";
+    tick = setInterval(() => {
+      const el = Math.floor((Date.now() - t0) / 1000);
+      const fresh = el !== lastSec; lastSec = el;
+      if(mode === "down60"){ const left = Math.max(0, 60 - el); clock.textContent = left;
+        if(fresh && left > 0){ if(left <= 3) SFX.count(); else if(left <= 10 || left === 30) SFX.tick(); }
+        if(left === 0){ clearInterval(tick); tick = null; SFX.end(); clock.textContent = "หมดเวลา"; t.textContent = "จับเวลาอีกครั้ง"; box.classList.remove("running"); try{ navigator.vibrate && navigator.vibrate([200,100,200]); }catch(e){} const inp = $("#in-" + target); if(inp) inp.focus(); } }
+      else { clock.textContent = el; if(fresh && el > 0 && el % 15 === 0) SFX.lap(); }
+    }, 250);
+  }
+});
+document.addEventListener("change", e => {
+  if(e.target.id === "lb-sex" || e.target.id === "lb-band"){ LB.sex = $("#lb-sex").value; LB.band = $("#lb-band").value; SFX.tap(); lbLoad(); }
+});
+document.addEventListener("input", e => {
+  const id = e.target.dataset && e.target.dataset.in; if(!id) return;
+  S.a[id] = e.target.value; save();
+});
+
+function fixState(){
+  if(!S.a || typeof S.a !== "object") S.a = {};
+  if(!S.skipped || typeof S.skipped !== "object") S.skipped = {};
+  const p = S.a.pain; if(p != null && !Array.isArray(p)) S.a.pain = [String(p)];
+  if(S.a.goal && !["fat","muscle","health","pain","sport"].includes(S.a.goal)) delete S.a.goal;
+  if(!(S.step >= 0 && S.step < STEPS.length)) S.step = 0;
+}
+function start(data){
+  if(data && data.a) S = Object.assign(S, data); else load();
+  fixState();
+  if(S.view === "result" && !S.a.goal) S.view = "start";
+  render(); syncSoundBtn();
+}
+var HOT = window.claude && window.claude.hot;
+if(HOT && HOT.snapshot) HOT.snapshot(() => S);
+if(HOT && HOT.ready) HOT.ready(start); else start((HOT && HOT.data) || {});
+</script>
+</body>
+</html>
