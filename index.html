@@ -130,6 +130,11 @@ input[type=text]{font-family:var(--body);width:100%;max-width:260px}
 .score-big small{font-size:20px;color:var(--muted);font-weight:600}
 .level{display:inline-block;font-weight:600;font-size:14px;padding:3px 10px;border-radius:999px;color:#fff;margin-top:6px}
 .pcard{max-width:330px;margin:14px auto 0}
+.linkbox{margin-top:12px;border:1.5px dashed var(--line);border-radius:12px;padding:12px 14px;text-align:center}
+.linkbox .lb-k{font-size:13px;color:var(--muted)}
+.linkbox .lb-url{font-family:var(--mono);font-size:17px;font-weight:600;margin:4px 0 10px;user-select:all;-webkit-user-select:all;word-break:break-all}
+.linkbox .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.linkbox .btn{font-size:14px;padding:12px 8px}
 .igsteps{margin-top:14px;border:1.5px solid var(--line);border-radius:12px;padding:14px;font-size:14px;line-height:1.6}
 .igsteps ol{margin:8px 0 12px 18px;padding:0}
 .igsteps .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -923,6 +928,8 @@ function cardSection(r, ar){
     <p class="sub">แถบพลังมาจากคะแนนจริงของคุณ เก็บไว้เทียบตอนทดสอบรอบหน้า หรือแชร์ให้เพื่อนลองบ้าง</p>
     <div class="pcard">${cardSVG(archKey(ar), r, ar, nm)}</div>
     <button class="btn btn-ig" id="savecard" type="button" style="width:100%;margin-top:12px">แชร์การ์ดลงสตอรี่ IG</button>
+    <div class="linkbox"><div class="lb-k">ลิงก์แบบทดสอบ ส่งให้เพื่อนเล่นต่อ</div><div class="lb-url">${SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "")}</div>
+      <div class="row2"><button class="btn" id="copylink2" type="button">คัดลอกลิงก์</button><button class="btn btn-primary" id="sharelink" type="button">ส่งลิงก์ให้เพื่อน</button></div></div>
     <div id="cardout"></div>
   </section>`;
 }
@@ -932,6 +939,11 @@ function copyLink(){
   try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(SHARE_URL).then(done, fallback); return; } }catch(e){}
   fallback();
   function fallback(){ try{ const ta = document.createElement("textarea"); ta.value = SHARE_URL; ta.setAttribute("readonly", ""); ta.style.cssText = "position:absolute;left:-9999px"; document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, 99999); document.execCommand("copy"); ta.remove(); done(); }catch(e){} }
+}
+function shareLink(){
+  const data = {title:"เช็กร่างกาย 5 นาที กับโค้ชฟูจิ", text:"ลองเช็กร่างกาย 5 นาที แล้วเปิดการ์ดของคุณ", url:SHARE_URL};
+  try{ if(navigator.share){ navigator.share(data).catch(() => {}); return; } }catch(e){}
+  copyLink(); const b = $("#sharelink"); if(b) b.textContent = "คัดลอกลิงก์แล้ว ✓";
 }
 function openIgStory(){
   const u = "instagram://story-camera";
@@ -1512,6 +1524,8 @@ document.addEventListener("click", e => {
   const t = e.target.closest("button"); if(!t) return;
   if(t.id === "savecard"){ saveCard(); return; }
   if(t.id === "copylink"){ copyLink(); return; }
+  if(t.id === "copylink2"){ copyLink(); t.textContent = "คัดลอกแล้ว ✓"; return; }
+  if(t.id === "sharelink"){ shareLink(); return; }
   if(t.id === "openig"){ openIgStory(); return; }
   if(t.id === "ig"){ SFX.tap(); const u = "https://instagram.com/" + encodeURIComponent(COACH.ig); const w = window.open(u, "_blank"); if(!w){ try{ window.top.location.href = u; }catch(err){ location.href = u; } } return; }
   if(t.id === "sound"){ soundOn = !soundOn; try{ localStorage.setItem("fuji-sound", soundOn ? "on" : "off"); }catch(e){} syncSoundBtn(); if(soundOn) SFX.tap(); return; }
