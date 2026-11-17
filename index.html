@@ -1275,7 +1275,7 @@ async function makeStoryVideo(mime, ac){
   const front = await svgImg(cardSVG(fk, r, ar, nm));
   const F = "'IBM Plex Sans Thai','Chakra Petch','Thonburi',sans-serif";
   const host = SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "");
-  const SPIN = 3300, SHAKE = 3300, REV = 4300, TOTAL = REV + 6500; // หลังเปิดค้างไว้ 6.5 วิ ให้ดูการ์ดทัน
+  const SPIN = 3300, SHAKE = 3300, REV = 4300, TOTAL = 15000; // วิดีโอยาว 15 วิ (โชว์การ์ดหลังเปิด 10.7 วิ)
   // มุมหมุน: เร่งแล้วผ่อน หมุน 7 รอบ
   const TURN = 7 * Math.PI * 2;
   // ความเร็วเพิ่มจนถึง 35% ของเวลา แล้วค่อยๆ ลดจนหยุด หน้าการ์ดจบที่ด้านหลังตรงพอดี
