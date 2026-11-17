@@ -1054,7 +1054,7 @@ function cardSection(r, ar){
     <h2>การ์ดร่างกายของ${nm}</h2>
     <p class="sub">แถบพลังมาจากคะแนนจริงของคุณ เก็บไว้เทียบตอนทดสอบรอบหน้า หรือแชร์ให้เพื่อนลองบ้าง</p>
     <div class="pcard">${cardSVG(archKey(ar), r, ar, nm)}</div>
-    ${IN_IG ? `<div class="alert" style="margin-top:12px">กำลังเปิดในแอป IG แนะนำกด <b>⋯</b> มุมขวาบน แล้วเลือก <b>“เปิดในเบราว์เซอร์ภายนอก”</b> ก่อนแชร์ จะได้ไม่ต้องเริ่มใหม่</div>` : ""}
+    ${igBanner("ผลของคุณจะไปอยู่ในเบราว์เซอร์ด้วย แชร์แล้วกลับมาดูได้ไม่หาย")}
     <button class="btn btn-ig" id="savecard" type="button" style="width:100%;margin-top:12px">แชร์การ์ดลงสตอรี่ IG</button>
     <div class="linkbox"><div class="lb-k">ลิงก์แบบทดสอบ ส่งให้เพื่อนเล่นต่อ</div><div class="lb-url">${SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "")}</div>
       <div class="row2"><button class="btn" id="copylink2" type="button">คัดลอกลิงก์</button><button class="btn btn-primary" id="sharelink" type="button">ส่งลิงก์ให้เพื่อน</button></div></div>
@@ -1062,6 +1062,19 @@ function cardSection(r, ar){
   </section>`;
 }
 const SHARE_URL = "https://fupichaya.github.io/";
+function openExternal(){
+  const u = location.href, ua = navigator.userAgent || "";
+  try{
+    if(/android/i.test(ua)){ const c = S.view === "result" ? encState() : ""; location.href = "intent://" + location.host + location.pathname + (c ? "?r=" + encodeURIComponent(c) : "") + "#Intent;scheme=https;end"; }
+    else location.href = "x-safari-" + u;
+  }catch(e){}
+  setTimeout(() => { const t = $("#toast2"); if(t) t.innerHTML = "ถ้าไม่เด้ง กด <b>⋯</b> มุมขวาบน แล้วเลือก <b>“เปิดในเบราว์เซอร์ภายนอก”</b>"; }, 1200);
+}
+function igBanner(why){
+  if(!IN_IG) return "";
+  return `<div class="alert igbanner" style="margin-top:12px"><b>กำลังเปิดในแอป IG</b> เปิดในเบราว์เซอร์จะลื่นกว่าและข้อมูลไม่หาย ${why}
+    <button class="btn btn-primary" id="openext" type="button" style="width:100%;margin-top:10px">เปิดใน${/android/i.test(navigator.userAgent || "") ? " Chrome" : " Safari"}</button><div class="meta" id="toast2" style="margin-top:6px"></div></div>`;
+}
 const IN_IG = (() => { try{ return /Instagram|FBAN|FBAV/i.test(navigator.userAgent); }catch(e){ return false; } })();
 function copyLink(){
   const done = () => { const b = $("#copylink"); if(b) b.textContent = "คัดลอกแล้ว ✓"; };
@@ -1130,7 +1143,8 @@ async function saveCard(){
     const c = await buildCard();
     const file = c.blob && typeof File === "function" ? new File([c.blob], "fuji-card.png", {type:"image/png"}) : null;
     let shared = false;
-    if(file && navigator.canShare && navigator.canShare({files:[file]})){
+    // ในแอป IG ไม่เด้งออกไปหน้าแชร์ (แอปจะปิดหน้านี้) ให้บันทึกรูปจากหน้านี้แทน
+    if(!IN_IG && file && navigator.canShare && navigator.canShare({files:[file]})){
       try{ await navigator.share({files:[file], title:"การ์ดร่างกายของฉัน"}); shared = true; }catch(err){ shared = err && err.name === "AbortError"; }
     }
     out.innerHTML = igSteps(shared) + (shared ? "" : `<img alt="การ์ดร่างกายของคุณ" style="width:100%;border-radius:14px;margin-top:10px" src="${c.url}">`);
@@ -1227,6 +1241,7 @@ function viewStart(){
     <p class="lead">เล่นแป๊บเดียว 5 นาที ตอบคำถามนิดหน่อย ลองท่าง่ายๆ ที่บ้าน แล้วมาดูกันว่าร่างกายคุณเป็นสายไหน และแข็งแรงแค่ไหนเมื่อเทียบกับคนวัยเดียวกัน</p>
     <div class="chips"><span class="chip">ความแข็งแรง</span><span class="chip">หัวใจและปอด</span><span class="chip">ความยืดหยุ่น</span><span class="chip">องค์ประกอบร่างกาย</span><span class="chip">ไลฟ์สไตล์</span></div>
   </section>
+  ${igBanner("ทำแบบทดสอบในเบราว์เซอร์ ผลจะถูกเก็บไว้ให้")}
   <section class="card">
     <h2>เล่นแล้วได้อะไร</h2>
     <div class="steps-list">
@@ -1736,12 +1751,12 @@ function encState(){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify
 function decState(h){ try{ const o = JSON.parse(decodeURIComponent(escape(atob(h)))); if(o && o.a && typeof o.a === "object") return o; }catch(e){} return null; }
 function syncHash(){
   try{
-    const base = location.pathname + location.search;
+    const base = location.pathname;
     if(S.view === "result"){ const c = encState(); if(c) history.replaceState(null, "", base + "#r=" + c); }
     else if(/^#r=/.test(location.hash)) history.replaceState(null, "", base);
   }catch(e){}
 }
-function fromHash(){ const m = /^#r=([A-Za-z0-9+/]+)/.exec(location.hash || ""); return m ? decState(m[1]) : null; }
+function fromHash(){ const m = /^#r=([A-Za-z0-9+/]+)/.exec(location.hash || "") || /[?&]r=([^&#]+)/.exec(location.search || ""); return m ? decState(decodeURIComponent(m[1])) : null; }
 /* ---------- render & events ---------- */
 let tick = null;
 function render(){
@@ -1777,6 +1792,7 @@ document.addEventListener("click", e => {
   if(t.id === "go"){ SFX.next(); return go("step", S.view === "start" && Object.keys(S.a).length ? S.step : 0); }
   if(t.id === "reset"){ SFX.back(); S = {view:"start", step:0, a:{}, skipped:{}, err:""}; LB = {state:"idle", data:null, sex:null, band:null, msg:""}; return go("start"); }
   if(t.id === "edit") return go("step", 0);
+  if(t.id === "openext"){ SFX.tap(); openExternal(); return; }
   if(t.id === "toplan"){ SFX.tap(); const pl = $("#plan"); if(pl) pl.scrollIntoView({behavior:"smooth", block:"start"}); return; }
   if(t.id === "redoskip"){ SFX.tap(); return go("step", testStepIdx()); }
   if(t.id === "back"){ SFX.back(); } if(t.id === "back") return S.step === 0 ? go("start") : go("step", S.step - 1);
