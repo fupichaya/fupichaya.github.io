@@ -307,7 +307,7 @@ textarea.copybox{width:100%;min-height:140px;font:13px var(--mono);border-radius
 
 .vidov{position:fixed;inset:0;z-index:65;background:rgba(3,6,5,.92);display:flex;align-items:center;justify-content:center;padding:14px}
 .vd-box{position:relative;width:min(92vw,400px);display:flex;flex-direction:column;gap:10px;align-items:stretch}
-.vd-box canvas{width:100%;max-height:68vh;object-fit:contain;border-radius:18px;background:#000;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.vd-box canvas,.vd-vid{width:100%;max-height:68vh;object-fit:contain;border-radius:18px;background:#000;box-shadow:0 10px 40px rgba(0,0,0,.6)}
 .vd-bar{height:6px;border-radius:6px;background:#20382c;overflow:hidden}.vd-bar i{display:block;height:100%;width:0;background:#3fd18f}
 .vd-msg{color:#e8f5ee;text-align:center;font-size:14px}
 .vd-btns{grid-template-columns:1fr;gap:8px}
@@ -1213,7 +1213,7 @@ async function savePng(){
 function vidMime(){
   try{
     if(typeof MediaRecorder !== "function" || !HTMLCanvasElement.prototype.captureStream) return "";
-    const list = ["video/mp4;codecs=avc1.42E01E", "video/mp4;codecs=avc1", "video/mp4"];
+    const list = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1.42E01E", "video/mp4;codecs=avc1", "video/mp4"];
     for(const m of list){ if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m; }
   }catch(e){}
   return "";
@@ -1226,10 +1226,42 @@ async function saveCard(){
   S.afterShare = Date.now(); save(); syncHash();
   const mime = vidMime();
   if(!mime) return savePng();
-  try{ await makeStoryVideo(mime); }catch(err){ const o = $(".vidov"); if(o) o.remove(); document.body.style.overflow = ""; savePng(); }
+  // เปิดระบบเสียงตอนกด (iOS ต้องเปิดจากการแตะเท่านั้น)
+  let ac = null;
+  try{ const AC = window.AudioContext || window.webkitAudioContext; if(AC){ ac = new AC(); if(ac.resume) ac.resume(); } }catch(e){ ac = null; }
+  try{ await makeStoryVideo(mime, ac); }
+  catch(err){ const o = $(".vidov"); if(o) o.remove(); document.body.style.overflow = ""; savePng(); }
+  finally{ try{ if(ac) setTimeout(() => ac.close(), 1500); }catch(e){} }
 }
-async function makeStoryVideo(mime){
+// เสียงในวิดีโอ: ติ๊กตอนการ์ดหมุน, เสียงลุ้นตอนสั่น, เสียงเปิดการ์ด
+function storySounds(ac, outs, t0, ticks, shakeAt, revealAt, rare){
+  const tone = (at, f, dur, type, vol, f2) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(f, at); if(f2) o.frequency.exponentialRampToValueAtTime(f2, at + dur);
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g); outs.forEach(d => g.connect(d)); o.start(at); o.stop(at + dur + 0.05);
+  };
+  const noise = (at, dur, vol, from, to) => {
+    const n = Math.floor(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = buf; bp.type = "bandpass"; bp.frequency.setValueAtTime(from, at); bp.frequency.exponentialRampToValueAtTime(to, at + dur); bp.Q.value = 1.2;
+    g.gain.setValueAtTime(vol, at); src.connect(bp); bp.connect(g); outs.forEach(o => g.connect(o)); src.start(at);
+  };
+  ticks.forEach((ms, i) => { const at = t0 + ms / 1000; tone(at, 1500 + (i % 2) * 300, 0.05, "square", 0.18); noise(at, 0.08, 0.25, 2500, 900); });
+  const sh = t0 + shakeAt / 1000, rv = t0 + revealAt / 1000;
+  tone(sh, 180, (revealAt - shakeAt) / 1000, "sawtooth", 0.12, 900);   // เสียงลุ้นไต่ขึ้น
+  tone(sh, 90, (revealAt - shakeAt) / 1000, "triangle", 0.2, 140);
+  for(let k = 0; k < 10; k++) tone(sh + k * (revealAt - shakeAt) / 1000 / 10, 700 + k * 90, 0.04, "square", 0.08);
+  noise(rv - 0.02, 0.6, 0.6, 400, 6000);                                // วูบเปิดการ์ด
+  tone(rv, 110, 0.7, "sine", 0.5, 50);                                  // ตุ้ม
+  const notes = rare ? [523, 659, 784, 1047, 1319, 1568] : [523, 659, 784, 1047];
+  notes.forEach((f, k) => { tone(rv + 0.08 + k * 0.09, f, 0.5, "triangle", 0.22); tone(rv + 0.08 + k * 0.09, f * 2, 0.35, "sine", 0.07); });
+  for(let k = 0; k < 8; k++) tone(rv + 0.6 + k * 0.07, 2000 + (k * 337) % 1800, 0.12, "sine", 0.06);  // วิ้งๆ
+}
+async function makeStoryVideo(mime, ac){
   const r = compute(), ar = archetype(r), fk = archKey(ar), FC = CARD[fk] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ";
+  const rare = !!(FC.tier || FC.rare);
   const ov = document.createElement("div");
   ov.className = "vidov";
   ov.innerHTML = `<div class="vd-box"><canvas width="720" height="1280"></canvas>
@@ -1240,82 +1272,94 @@ async function makeStoryVideo(mime){
   document.body.appendChild(ov); document.body.style.overflow = "hidden";
   const cv = ov.querySelector("canvas"), x = cv.getContext("2d"), W = 720, H = 1280;
   if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  // เตรียมรูปการ์ด: ทุกสาย + การ์ดของฉัน
-  const keys = Object.keys(ARCH).filter(k => k.indexOf("evo_") !== 0 && k !== speciesOf(fk));
-  const imgs = {};
-  await Promise.all(keys.concat([fk]).map(async k => { try{ imgs[k] = await svgImg(cardSVG(k, r, ARCH[k], nm)); }catch(e){} }));
-  if(!imgs[fk]) throw new Error("no card");
-  const pool = keys.filter(k => imgs[k]);
-  // ตารางสลับการ์ด: เร็วแล้วค่อยๆ ช้าลง
-  const swaps = []; let t = 0, gap = 70, i = 0;
-  while(t < 3600){ swaps.push({t, k: pool[(i * 7 + 3) % pool.length]}); t += gap; gap = Math.min(520, gap * 1.13); i++; }
-  const REEL = t; swaps.push({t: REEL, k: fk});
-  const TOTAL = REEL + 3600;
+  const front = await svgImg(cardSVG(fk, r, ar, nm));
   const F = "'IBM Plex Sans Thai','Chakra Petch','Thonburi',sans-serif";
   const host = SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "");
-  const parts = Array.from({length: 46}, (_, j) => ({a: j / 46 * Math.PI * 2 + (j % 3) * 0.4, v: 260 + (j * 53) % 320, s: 5 + j % 6, c: ["#f5c84b", "#fff", FC.acc, "#ff7ab8"][j % 4]}));
+  const SPIN = 3300, SHAKE = 3300, REV = 4300, TOTAL = REV + 3300;
+  // มุมหมุน: เร่งแล้วผ่อน หมุน 7 รอบ
+  const TURN = 7 * Math.PI * 2;
+  // ความเร็วเพิ่มจนถึง 35% ของเวลา แล้วค่อยๆ ลดจนหยุด หน้าการ์ดจบที่ด้านหลังตรงพอดี
+  const raw = u => u < 0.35 ? u * u / 0.7 : 0.175 + (u - 0.35) - Math.pow(u - 0.35, 2) / 1.3;
+  const ang = ms => TURN * raw(Math.min(1, ms / SPIN)) / raw(1);
+  const ticks = []; { let last = 0; for(let ms = 0; ms <= SPIN; ms += 4){ const k = Math.floor((ang(ms) + Math.PI / 2) / Math.PI); if(k > last){ ticks.push(ms); last = k; } } }
+  const parts = Array.from({length: 54}, (_, j) => ({a: j / 54 * Math.PI * 2 + (j % 3) * 0.4, v: 260 + (j * 53) % 340, s: 5 + j % 6, c: ["#f5c84b", "#fff", FC.acc, "#ff7ab8"][j % 4]}));
   const cw = 470, ch = Math.round(cw * 560 / 340), cx = W / 2, cy = 650;
   function text(tx, y, size, color, w){ x.font = `${w || 700} ${size}px ${F}`; x.fillStyle = color; x.textAlign = "center"; x.fillText(tx, W / 2, y); }
+  function rr(px, py, w, h, rad){ x.beginPath(); x.moveTo(px + rad, py); x.arcTo(px + w, py, px + w, py + h, rad); x.arcTo(px + w, py + h, px, py + h, rad); x.arcTo(px, py + h, px, py, rad); x.arcTo(px, py, px + w, py, rad); x.closePath(); }
+  function back(glow){ // หลังการ์ด
+    const w = cw, h = ch;
+    x.save(); if(glow){ x.shadowColor = "#3fd18f"; x.shadowBlur = glow; }
+    rr(-w / 2, -h / 2, w, h, 28); const g = x.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, "#143a2a"); g.addColorStop(1, "#0b1a13"); x.fillStyle = g; x.fill();
+    x.lineWidth = 6; x.strokeStyle = "#3fd18f"; x.stroke(); x.restore();
+    x.save(); x.setLineDash([10, 12]); x.lineWidth = 2; x.strokeStyle = "rgba(63,209,143,.4)"; rr(-w / 2 + 22, -h / 2 + 22, w - 44, h - 44, 18); x.stroke(); x.restore();
+    for(let k = 0; k < 7; k++){ x.fillStyle = "rgba(63,209,143,.10)"; x.beginPath(); x.arc(0, 0, 60 + k * 32, 0, Math.PI * 2); x.fill(); }
+    x.fillStyle = "#1b4a35"; x.beginPath(); x.arc(0, 0, 120, 0, Math.PI * 2); x.fill(); x.lineWidth = 4; x.strokeStyle = "#3fd18f"; x.stroke();
+    x.font = `800 170px ${F}`; x.fillStyle = "#3fd18f"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("?", 0, 8); x.textBaseline = "alphabetic";
+    x.font = `700 26px ${F}`; x.fillStyle = "#8fd0b0"; x.fillText("FUJI BODY CARD", 0, h / 2 - 70);
+    x.font = `500 20px ${F}`; x.fillStyle = "rgba(143,208,176,.7)"; x.fillText("18 สาย · หายากมี RARE / LEGENDARY", 0, -h / 2 + 70);
+  }
   function draw(ms){
-    const rev = ms >= REEL, rt = ms - REEL;
-    const bgc = rev ? FC.bg : "#0b1310";
+    const rev = ms >= REV, rt = ms - REV;
     x.fillStyle = "#05080a"; x.fillRect(0, 0, W, H);
-    const g = x.createRadialGradient(cx, cy, 40, cx, cy, 820); g.addColorStop(0, bgc); g.addColorStop(1, "#05080a");
+    const g = x.createRadialGradient(cx, cy, 40, cx, cy, 820); g.addColorStop(0, rev ? FC.bg : "#0f2a1e"); g.addColorStop(1, "#05080a");
     x.fillStyle = g; x.fillRect(0, 0, W, H);
-    if(rev){ // แสงหมุน
-      x.save(); x.translate(cx, cy); x.rotate(rt / 2600); x.globalAlpha = Math.min(1, rt / 400) * 0.22; x.fillStyle = FC.acc;
+    if(!rev){ // การ์ดหลังเล็กๆ ลอยเป็นฉากหลัง
+      for(let k = 0; k < 9; k++){ const yy = ((k * 157 + ms * (0.05 + k * 0.012)) % 1500) - 110, xx = 60 + (k * 233) % 600;
+        x.save(); x.globalAlpha = 0.12; x.translate(xx, H - yy); x.rotate(Math.sin(ms / 700 + k) * 0.4); rr(-30, -46, 60, 92, 8); x.fillStyle = "#3fd18f"; x.fill(); x.restore(); }
+    } else {
+      x.save(); x.translate(cx, cy); x.rotate(rt / 2600); x.globalAlpha = Math.min(1, rt / 400) * 0.24; x.fillStyle = FC.acc;
       for(let j = 0; j < 16; j++){ x.rotate(Math.PI / 8); x.beginPath(); x.moveTo(0, 0); x.lineTo(-60, -1100); x.lineTo(60, -1100); x.closePath(); x.fill(); }
       x.restore();
     }
     // หัวเรื่อง
-    if(!rev) text("ร่างกายฉันเป็นสายไหน?", 150, 46, "#e8f5ee");
-    else { const a = Math.min(1, rt / 500); x.globalAlpha = a; text(`${nm} คือ`, 120, 34, "#cfe"); text(ar.t, 180, 54, FC.acc, 800); x.globalAlpha = 1; }
+    if(!rev){ text("ร่างกายฉันเป็นสายไหน?", 140, 46, "#e8f5ee"); text(ms < SHAKE ? "กำลังสุ่มการ์ด…" : "ลุ้น…", 192, 30, "#8fd0b0", 500); }
+    else { const a = Math.min(1, rt / 450); x.globalAlpha = a; text(rare ? `ว้าว! ${nm} ได้การ์ด ${FC.tier || "RARE"}` : `${nm} คือ`, 120, 32, rare ? "#f5c84b" : "#cfe"); text(ar.t, 184, 54, FC.acc, 800); x.globalAlpha = 1; }
     // การ์ด
-    let k = fk, sx = 1, sc = 1, shake = 0;
-    if(!rev){
-      let cur = swaps[0]; for(const sw of swaps){ if(sw.t <= ms) cur = sw; else break; }
-      const nx = swaps[swaps.indexOf(cur) + 1], len = nx ? nx.t - cur.t : 100, p = (ms - cur.t) / len;
-      k = cur.k; sx = Math.max(0.06, Math.min(1, p * 2.2)); // พลิกเข้ามาทีละใบ
-      shake = ms > REEL - 900 ? Math.sin(ms / 18) * (ms - REEL + 900) / 90 : 0;
+    x.save(); x.translate(cx, cy);
+    if(ms < SPIN){
+      const sx = Math.cos(ang(ms)); x.scale(Math.max(0.03, Math.abs(sx)), 1); back(20);
+    } else if(ms < REV){
+      const k = (ms - SHAKE) / (REV - SHAKE), amp = 4 + k * 16;
+      x.translate(Math.sin(ms / 16) * amp, Math.cos(ms / 21) * amp * 0.4); x.rotate(Math.sin(ms / 28) * k * 0.05); x.scale(1 + k * 0.08, 1 + k * 0.08);
+      back(20 + k * 60);
     } else {
-      sx = Math.min(1, rt / 160); sc = 1 + Math.max(0, 0.12 - rt / 2500) ;
+      // พลิกเปิด: ครึ่งแรกหลังการ์ดหดเข้า ครึ่งหลังหน้าการ์ดกางออก
+      const f = Math.min(1, rt / 260);
+      if(f < 0.5){ x.scale(Math.max(0.03, 1.08 * (1 - f * 2)), 1.08); back(80); }
+      else { const sc = 1 + Math.max(0, 0.1 - rt / 3000); x.scale(Math.max(0.03, (f - 0.5) * 2) * sc, sc); x.shadowColor = FC.acc; x.shadowBlur = 60; x.drawImage(front, -cw / 2, -ch / 2, cw, ch); }
     }
-    const im = imgs[k] || imgs[fk];
-    x.save(); x.translate(cx + shake, cy); x.scale(sx * sc, sc);
-    if(rev){ x.shadowColor = FC.acc; x.shadowBlur = 50; }
-    x.drawImage(im, -cw / 2, -ch / 2, cw, ch);
     x.restore();
-    if(!rev){ // เครื่องหมาย ? ลอยบนการ์ดที่กำลังหมุน
-      x.globalAlpha = 0.85; text("?", cy + 40, 150, "rgba(255,255,255,.9)", 800); x.globalAlpha = 1;
-    }
-    // ประกายแตก
-    if(rev && rt < 2200){
+    if(rev && rt < 2400){
       const pr = rt / 1000;
-      parts.forEach(q => { const d = q.v * pr, yy = cy + Math.sin(q.a) * d + 160 * pr * pr; x.globalAlpha = Math.max(0, 1 - rt / 2200); x.fillStyle = q.c;
-        x.fillRect(cx + Math.cos(q.a) * d, yy, q.s, q.s * 1.6); });
+      parts.forEach(q => { const d = q.v * pr, yy = cy + Math.sin(q.a) * d + 170 * pr * pr; x.globalAlpha = Math.max(0, 1 - rt / 2400); x.fillStyle = q.c; x.fillRect(cx + Math.cos(q.a) * d, yy, q.s, q.s * 1.6); });
       x.globalAlpha = 1;
     }
-    // แฟลช
-    if(rev && rt < 450){ x.fillStyle = `rgba(255,255,255,${(1 - rt / 450) * 0.95})`; x.fillRect(0, 0, W, H); }
-    // ท้ายจอ
+    if(rev && rt > 120 && rt < 600){ x.fillStyle = `rgba(255,255,255,${(1 - (rt - 120) / 480) * 0.95})`; x.fillRect(0, 0, W, H); }
     text("เช็กร่างกาย 5 นาที กับโค้ชฟูจิ", 1150, 30, "#e8f5ee");
-    text(rev ? "แตะลิงก์ด้านล่าง ทายการ์ดของคุณ ↓" : "กำลังสุ่มการ์ด…", 1196, 26, rev ? FC.acc : "#8fb0a0", 500);
+    text(rev ? "แตะลิงก์ด้านล่าง ลุ้นการ์ดของคุณ ↓" : "การ์ดของฉันคือตัวไหน?", 1196, 26, rev ? FC.acc : "#8fb0a0", 500);
     text(host, 1246, 22, "rgba(232,245,238,.55)", 500);
   }
   draw(0);
-  const stream = cv.captureStream(30), rec = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: 6000000}), chunks = [];
+  const vstream = cv.captureStream(30);
+  let dest = null;
+  if(ac){ try{ dest = ac.createMediaStreamDestination(); }catch(e){ dest = null; } }
+  const tracks = vstream.getVideoTracks().concat(dest ? dest.stream.getAudioTracks() : []);
+  const stream = new MediaStream(tracks);
+  let rec;
+  try{ rec = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: 6000000}); }
+  catch(e){ rec = new MediaRecorder(new MediaStream(vstream.getVideoTracks()), {mimeType: mime.split(";")[0], videoBitsPerSecond: 6000000}); }
+  const chunks = [];
   rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
   const done = new Promise(res => rec.onstop = res);
   rec.start(250);
-  const bar = ov.querySelector(".vd-bar i"), t0 = performance.now();
-  let stopped = false, ticked = -1;
+  if(ac && dest){ const outs = [dest]; if(soundOn) outs.push(ac.destination); try{ storySounds(ac, outs, ac.currentTime + 0.05, ticks, SHAKE, REV, rare); }catch(e){} }
+  const bar = ov.querySelector(".vd-bar i"), t0 = performance.now() + 50;
+  let stopped = false;
   await new Promise(res => {
     const step = () => {
       if(stopped) return res();
-      const ms = performance.now() - t0;
+      const ms = Math.max(0, performance.now() - t0);
       draw(Math.min(ms, TOTAL)); bar.style.width = Math.min(100, ms / TOTAL * 100) + "%";
-      const sw = swaps.filter(s => s.t <= ms).length; if(sw !== ticked && ms < REEL){ ticked = sw; try{ SFX.tick(); }catch(e){} }
-      if(ms >= REEL && ticked !== -2){ ticked = -2; try{ SFX.result(); }catch(e){} }
       if(ms >= TOTAL + 300) return res();
       requestAnimationFrame(step);
     };
@@ -1327,13 +1371,15 @@ async function makeStoryVideo(mime){
   const type = mime.split(";")[0], blob = new Blob(chunks, {type});
   if(!blob.size) throw new Error("empty video");
   const file = new File([blob], "fuji-card.mp4", {type});
-  ov.querySelector(".vd-msg").textContent = "วิดีโอพร้อมแล้ว! ลิงก์คัดลอกไว้ให้แล้ว ลงสตอรี่แล้วใส่สติกเกอร์ลิงก์";
+  // โชว์วิดีโอจริงที่ได้ (แตะเพื่อฟังเสียง)
+  const vurl = URL.createObjectURL(blob), vid = document.createElement("video");
+  vid.src = vurl; vid.muted = true; vid.loop = true; vid.autoplay = true; vid.playsInline = true; vid.setAttribute("playsinline", ""); vid.className = "vd-vid";
+  cv.replaceWith(vid); try{ vid.play(); }catch(e){}
+  vid.onclick = () => { vid.muted = !vid.muted; try{ vid.play(); }catch(e){} };
+  ov.querySelector(".vd-msg").textContent = "วิดีโอพร้อมแล้ว! แตะวิดีโอเพื่อฟังเสียง · ลิงก์คัดลอกไว้ให้แล้ว";
   ov.querySelector(".vd-bar").style.display = "none";
   ov.querySelector(".vd-btns").style.display = "grid";
-  // เล่นวนให้ดูเป็นตัวอย่าง
-  let loop = true; const t1 = performance.now();
-  const replay = () => { if(!loop) return; draw((performance.now() - t1) % (TOTAL + 600)); requestAnimationFrame(replay); }; replay();
-  const close = () => { loop = false; ov.remove(); document.body.style.overflow = ""; };
+  const close = () => { try{ vid.pause(); }catch(e){} ov.remove(); document.body.style.overflow = ""; };
   ov.querySelector("#vd-close").onclick = close;
   ov.querySelector("#vd-png").onclick = () => { close(); savePng(); };
   ov.querySelector("#vd-share").onclick = async () => {
@@ -1343,8 +1389,7 @@ async function makeStoryVideo(mime){
       try{ await navigator.share({files:[file], title:"การ์ดร่างกายของฉัน"}); close(); if(out){ out.innerHTML = igSteps(true); } return; }
       catch(err){ if(err && err.name === "AbortError") return; }
     }
-    // แชร์ไฟล์ไม่ได้: ให้ดาวน์โหลดวิดีโอแทน
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "fuji-card.mp4"; document.body.appendChild(a); a.click(); a.remove();
+    const a = document.createElement("a"); a.href = vurl; a.download = "fuji-card.mp4"; document.body.appendChild(a); a.click(); a.remove();
     ov.querySelector(".vd-msg").textContent = "บันทึกวิดีโอแล้ว เปิด IG สตอรี่ แล้วเลือกวิดีโอนี้";
   };
 }
