@@ -1054,6 +1054,7 @@ function cardSection(r, ar){
     <h2>การ์ดร่างกายของ${nm}</h2>
     <p class="sub">แถบพลังมาจากคะแนนจริงของคุณ เก็บไว้เทียบตอนทดสอบรอบหน้า หรือแชร์ให้เพื่อนลองบ้าง</p>
     <div class="pcard">${cardSVG(archKey(ar), r, ar, nm)}</div>
+    ${IN_IG ? `<div class="alert" style="margin-top:12px">กำลังเปิดในแอป IG แนะนำกด <b>⋯</b> มุมขวาบน แล้วเลือก <b>“เปิดในเบราว์เซอร์ภายนอก”</b> ก่อนแชร์ จะได้ไม่ต้องเริ่มใหม่</div>` : ""}
     <button class="btn btn-ig" id="savecard" type="button" style="width:100%;margin-top:12px">แชร์การ์ดลงสตอรี่ IG</button>
     <div class="linkbox"><div class="lb-k">ลิงก์แบบทดสอบ ส่งให้เพื่อนเล่นต่อ</div><div class="lb-url">${SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "")}</div>
       <div class="row2"><button class="btn" id="copylink2" type="button">คัดลอกลิงก์</button><button class="btn btn-primary" id="sharelink" type="button">ส่งลิงก์ให้เพื่อน</button></div></div>
@@ -1061,6 +1062,7 @@ function cardSection(r, ar){
   </section>`;
 }
 const SHARE_URL = "https://fupichaya.github.io/";
+const IN_IG = (() => { try{ return /Instagram|FBAN|FBAV/i.test(navigator.userAgent); }catch(e){ return false; } })();
 function copyLink(){
   const done = () => { const b = $("#copylink"); if(b) b.textContent = "คัดลอกแล้ว ✓"; };
   try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(SHARE_URL).then(done, fallback); return; } }catch(e){}
@@ -1121,7 +1123,7 @@ function showAfterShare(){
 async function saveCard(){
   const out = $("#cardout"), btn = $("#savecard");
   copyLink(); // คัดลอกทันทีตอนกด (ก่อนรออะไร) ไม่งั้น iOS ไม่ยอมให้คัดลอก
-  S.afterShare = Date.now(); save(); // ถ้าเบราว์เซอร์รีโหลดหน้าตอนกลับมา จะพากลับมาที่ลิงก์
+  S.afterShare = Date.now(); save(); syncHash(); // ถ้าเบราว์เซอร์รีโหลดหน้าตอนกลับมา จะพากลับมาที่ลิงก์
   try{
     const ready = CARDIMG && CARDIMG.sig === cardSig();
     if(!ready){ btn.disabled = true; btn.textContent = "กำลังสร้างรูป…"; }
@@ -1158,7 +1160,7 @@ function nextSection(r, ar){
   const row = x => `<li class="${x[0] ? "ok" : ""}"><span>${x[0] ? "✓" : "○"}</span><span>${x[1]}<small>${x[2]}</small></span></li>`;
   if(k === "evo_legend") return `<section class="card nextsec"><div class="nx-k">ร่างสูงสุดของทั้งเกม</div><h2>คุณคือ${ar.t}</h2>
     <p class="sub">ไม่มีร่างไหนเหนือกว่านี้แล้ว รักษาร่างนี้ไว้ด้วยโปรแกรมด้านล่าง แล้วกลับมาทดสอบทุก 8 สัปดาห์</p>
-    <a class="btn btn-primary" href="#plan" style="width:100%;margin-top:12px;text-decoration:none">ดูโปรแกรมรักษาร่าง ↓</a></section>`;
+    <button class="btn btn-primary" id="toplan" type="button" style="width:100%;margin-top:12px">ดูโปรแกรมรักษาร่าง ↓</button></section>`;
   // ยังไม่วิวัฒนาการ: เงาร่างวิวัฒนาการของตัวเอง / วิวัฒนาการแล้ว: เป้าหมายต่อไปคือมังกรตำนาน
   const tk = evolved ? "legend" : sp, C = CARD[tk], art = evolved ? CARD.legend.m : CARD["evo_" + sp].m;
   const rows = evolved ? r.dom.map(d => qd(r, d.k, 85)) : EVO[sp].req(r);
@@ -1172,7 +1174,7 @@ function nextSection(r, ar){
     </div>
     <div class="nx-need"><b>${evolved ? "ปลดล็อกเมื่อ" : "วิวัฒนาการเมื่อ"}</b><ul>${rows.map(row).join("")}</ul></div>
     <p class="meta" style="margin-top:8px">ทำตามโปรแกรม 6–8 สัปดาห์ แล้วกลับมาทดสอบใหม่ในเครื่องเดิม กด “แก้คำตอบ” ใส่ผลใหม่ ถ้าผ่านครบ การ์ดจะ${evolved ? "กลายเป็นร่างตำนาน" : "วิวัฒนาการ"}</p>
-    <a class="btn btn-primary" href="#plan" style="width:100%;margin-top:12px;text-decoration:none">ไปที่โปรแกรมของคุณ ↓</a>
+    <button class="btn btn-primary" id="toplan" type="button" style="width:100%;margin-top:12px">ไปที่โปรแกรมของคุณ ↓</button>
   </section>`;
 }
 
@@ -1728,6 +1730,18 @@ function confetti(){
   })(t0);
 }
 
+
+/* ---------- สำรองผลไว้ในลิงก์ (#r=) เผื่อแอป IG ล้างข้อมูลในเครื่องตอนสลับไปลงสตอรี่ ---------- */
+function encState(){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify({a:S.a, k:S.skipped, sp:S.species || "", af:S.afterShare || 0, nm:S.lbName || ""})))).replace(/=+$/, ""); }catch(e){ return ""; } }
+function decState(h){ try{ const o = JSON.parse(decodeURIComponent(escape(atob(h)))); if(o && o.a && typeof o.a === "object") return o; }catch(e){} return null; }
+function syncHash(){
+  try{
+    const base = location.pathname + location.search;
+    if(S.view === "result"){ const c = encState(); if(c) history.replaceState(null, "", base + "#r=" + c); }
+    else if(/^#r=/.test(location.hash)) history.replaceState(null, "", base);
+  }catch(e){}
+}
+function fromHash(){ const m = /^#r=([A-Za-z0-9+/]+)/.exec(location.hash || ""); return m ? decState(m[1]) : null; }
 /* ---------- render & events ---------- */
 let tick = null;
 function render(){
@@ -1736,7 +1750,7 @@ function render(){
   try{ app.innerHTML = S.view === "start" ? viewStart() : S.view === "step" ? viewStep() : viewResult(); }
   catch(err){ // ข้อมูลเก่าในเครื่องพัง: เริ่มใหม่แทนที่จะเป็นหน้าว่าง
     S = {view:"start", step:0, a:{}, skipped:{}, err:""}; app.innerHTML = viewStart(); }
-  save(); startAnims();
+  save(); syncHash(); startAnims();
   if(S.view === "result" && LEADERBOARD_URL && LB_HOST_OK){ logCompletion(); if(!lbAuto()) lbLoad(); }
   if(S.view === "result") prepCard();
 }
@@ -1763,6 +1777,7 @@ document.addEventListener("click", e => {
   if(t.id === "go"){ SFX.next(); return go("step", S.view === "start" && Object.keys(S.a).length ? S.step : 0); }
   if(t.id === "reset"){ SFX.back(); S = {view:"start", step:0, a:{}, skipped:{}, err:""}; LB = {state:"idle", data:null, sex:null, band:null, msg:""}; return go("start"); }
   if(t.id === "edit") return go("step", 0);
+  if(t.id === "toplan"){ SFX.tap(); const pl = $("#plan"); if(pl) pl.scrollIntoView({behavior:"smooth", block:"start"}); return; }
   if(t.id === "redoskip"){ SFX.tap(); return go("step", testStepIdx()); }
   if(t.id === "back"){ SFX.back(); } if(t.id === "back") return S.step === 0 ? go("start") : go("step", S.step - 1);
   if(t.id === "next"){
@@ -1842,6 +1857,7 @@ function fixState(){
 }
 function start(data){
   if(data && data.a) S = Object.assign(S, data); else load();
+  if(S.view !== "result"){ const h = fromHash(); if(h){ S.a = h.a; S.skipped = h.k || {}; S.species = h.sp || undefined; S.afterShare = h.af || 0; if(h.nm) S.lbName = h.nm; S.view = "result"; } }
   fixState();
   if(S.view === "result" && !S.a.goal) S.view = "start";
   const back = S.view === "result" && S.afterShare && Date.now() - S.afterShare < 3600000;
