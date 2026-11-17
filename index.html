@@ -370,8 +370,10 @@ function rhrNorm(v, age, sex){
   return {i, lv:RHR_LV[i], next, group:`${sexTh()} ${row[1] ? `${row[0]}–${row[1]}` : `${row[0]} ปีขึ้นไป`}${row[1] ? " ปี" : ""}${edge}`, score:[100,90,80,70,55,40,25][i]};
 }
 
-function compute(zeroSkip){
-  // zeroSkip: ใช้คิดคะแนนตารางอันดับ ท่าที่ข้ามนับเป็น 0 ทีละท่า (ข้ามท่าที่อ่อนแล้วคะแนนสูงขึ้นไม่ได้)
+function compute(measured){
+  // คะแนนผล/การ์ด/อันดับ: ท่าที่ข้ามนับเป็น 0 ทีละท่า (ข้ามท่าที่อ่อนแล้วคะแนนสูงขึ้นไม่ได้)
+  // measured = true: ใช้เฉพาะท่าที่ทำจริง สำหรับเลือกระดับท่าในตารางออกกำลังกาย
+  const zeroSkip = measured !== true;
   const Z = v => zeroSkip && (v == null || isNaN(v)) ? 0 : v;
   const a = S.a, age = n("age") || 30, female = a.sex === "f";
   // strength
@@ -1015,6 +1017,10 @@ async function saveCard(){
   }finally{ btn.disabled = false; btn.textContent = "แชร์การ์ดลงสตอรี่ IG"; }
 }
 
+function skipIn(k){
+  const M = {strength:["squat","push","plank"], cardio:["rhr","march"], flex:["toe","reach"]}, SH = {rhr:"ชีพจร", squat:"ลุกนั่ง", push:"วิดพื้น", plank:"แพลงก์", toe:"ก้มแตะเท้า", reach:"เอื้อมมือไขว้หลัง", march:"ย่ำเท้า"};
+  return (M[k] || []).filter(id => S.skipped[id] || S.a[id] === undefined || S.a[id] === "").map(id => SH[id]);
+}
 function testStepIdx(){ return STEPS.findIndex(st => st.id === "test"); }
 function skippedTests(){
   const st = STEPS[testStepIdx()]; if(!st) return [];
@@ -1178,7 +1184,7 @@ function deviceId(){
 let LB = {state:"idle", data:null, sex:null, band:null, msg:""};
 function lbEligible(r){ return r.dom[0].s != null && r.dom[1].s != null && r.dom[2].s != null; }
 // คะแนนในตารางอันดับ: ท่าที่ข้ามนับเป็น 0 ทีละท่า ทำครบเท่านั้นถึงได้เท่าคะแนนในหน้าผล
-function lbScore(){ const z = compute(true); return Math.round(z.dom.reduce((t,d) => t + (d.s || 0), 0) / z.dom.length); }
+function lbScore(){ const z = compute(); return Math.round(z.dom.reduce((t,d) => t + (d.s || 0), 0) / z.dom.length); }
 // ตารางอันดับทำงานเฉพาะหน้าที่เปิดผ่านลิงก์ Google (QR) เท่านั้น
 const LB_HOST_OK = (() => { try { return !/claude/i.test(location.hostname); } catch(e){ return true; } })();
 function lbSection(r, ar){
@@ -1191,7 +1197,7 @@ function lbSection(r, ar){
   const missing = skippedTests();
   form = `<div class="lb-form">
       <div class="meta">ส่งคะแนน <b>${lbScore()}</b> เข้าอันดับให้อัตโนมัติแล้ว ในชื่อ <b>${esc(lbName())}</b> · ขึ้นแค่ชื่อ คะแนนรวม และฉายาร่างกาย ไม่แสดงอายุ น้ำหนัก หรือข้อมูลสุขภาพ</div>
-      ${missing.length ? `<div class="alert">ท่าที่ข้าม (${missing.join(", ")}) นับเป็น 0 ในตารางอันดับ คะแนนอันดับ ${lbScore()} เลยต่ำกว่าคะแนนในหน้านี้ (${nn(r.overall, "-")}) ทำครบทุกท่าแล้วสองคะแนนจะเท่ากัน <button class="skip" id="redoskip">กลับไปทำท่าที่ข้าม</button></div>` : ""}
+      ${missing.length ? `<div class="meta">ท่าที่ข้าม (${missing.join(", ")}) นับเป็น 0</div>` : ""}
       <div class="inrow"><input type="text" id="lb-name" maxlength="20" value="${esc(S.lbName || S.a.name || "")}" placeholder="${esc(lbAlias())}" aria-label="ชื่อที่แสดงในอันดับ"><button class="btn btn-ghost" id="lb-send" style="min-height:46px">เปลี่ยนชื่อ</button></div>
     </div>`;
   let board = "";
@@ -1280,7 +1286,7 @@ function summaryText(r, ar){
 }
 
 function viewResult(){
-  const r = compute(), ar = archetype(r), lv = levelOf(r.overall), pl = plan(r), wk = pl.days, ms = missions(), helps = coachHelps(r);
+  const r = compute(), ar = archetype(r), lv = levelOf(r.overall), pl = plan(compute(true)), wk = pl.days, ms = missions(), helps = coachHelps(r);
   const nm = S.a.name ? esc(S.a.name) : "คุณ";
   const metaFor = k => {
     if(k === "body" && r.bmi) return `BMI ${r.bmi.toFixed(1)} (เกณฑ์คนเอเชีย ปกติ 18.5–22.9)${r.whr ? ` · รอบเอว/ส่วนสูง ${r.whr.toFixed(2)} (ควรต่ำกว่า 0.5)` : ""}`;
@@ -1292,7 +1298,9 @@ function viewResult(){
   };
   const doms = r.dom.map(d => { const l = levelOf(d.s);
     return `<div class="dom"><b>${d.name}</b><span class="pill" style="color:${l.col}">${d.s == null ? "ไม่ได้ทดสอบ" : `<span class="num">${d.s}</span> · ${l.t}`}</span>
-      <div class="bar"><i style="width:${d.s || 0}%;background:${l.col}"></i></div><div class="meta">${metaFor(d.k)}</div></div>`; }).join("");
+      <div class="bar"><i style="width:${d.s || 0}%;background:${l.col}"></i></div><div class="meta">${metaFor(d.k)}${skipIn(d.k).length ? ` · <b style="color:var(--bad)">ข้าม ${skipIn(d.k).join(", ")} นับเป็น 0</b>` : ""}</div></div>`; }).join("");
+  const sk = skippedTests();
+  const skipNote = sk.length ? `<div class="alert"><b>ข้ามไป ${sk.length} ท่า (${sk.join(", ")})</b> ท่าที่ข้ามนับเป็น 0 คะแนนรวมกับการ์ดเลยยังไม่ใช่ตัวจริงของคุณ ทำให้ครบแล้วคะแนนกับการ์ดจะเปลี่ยนตาม <button class="skip" id="redoskip">กลับไปทำท่าที่ข้าม</button></div>` : "";
   const safety = r.parqYes ? `<div class="alert"><b>ก่อนเริ่ม:</b> คุณมีข้อที่ตรงในหัวข้อเช็กความพร้อม ควรปรึกษาแพทย์ก่อนเริ่มโปรแกรมที่หนักขึ้น ตารางด้านล่างปรับเป็นความหนักต่ำถึงปานกลางให้แล้ว</div>` : "";
   const contact = [COACH.line ? `LINE: ${esc(COACH.line)}` : "", COACH.ig ? `IG: ${esc(COACH.ig)}` : ""].filter(Boolean).join(" · ");
   return `
@@ -1311,6 +1319,7 @@ function viewResult(){
       <p style="margin-top:6px">${ar.d}</p>
     </div>
   </section>
+  ${skipNote}
   ${safety}
   ${cardSection(r, ar)}
   <section class="card">
