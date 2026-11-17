@@ -314,6 +314,8 @@ function bandDown(v, t){ let s = 100; t.forEach(x => { if(v >= x) s -= 20; }); r
 function avg(arr){ const v = arr.filter(x => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((p,c)=>p+c,0)/v.length) : null; }
 function unitOf(id){ return S.a[id+"Unit"] === "in" ? "in" : "cm"; }
 function rng(q){ return q.units && unitOf(q.id) !== "cm" ? Object.assign({}, q, q.units[unitOf(q.id)], {unit:q.units[unitOf(q.id)].label}) : q; }
+// วิดพื้นมี 2 ข้อ (แบบที่ทำ + จำนวนครั้ง) ข้ามหรือกลับมาทำพร้อมกัน
+function linked(k){ return k === "push" || k === "pushStyle" ? ["pushStyle", "push"] : [k]; }
 function n(k){ const v = S.a[k]; if(v === undefined || v === "" || S.skipped[k]) return null; const x = Number(v); return isNaN(x) ? null : x; }
 function nn(v, d){ return v === undefined || v === null ? d : v; }
 function c(k){ return S.skipped[k] ? null : nn(S.a[k], null); }
@@ -1011,6 +1013,12 @@ async function saveCard(){
   }finally{ btn.disabled = false; btn.textContent = "แชร์การ์ดลงสตอรี่ IG"; }
 }
 
+function testStepIdx(){ return STEPS.findIndex(st => st.id === "test"); }
+function skippedTests(){
+  const st = STEPS[testStepIdx()]; if(!st) return [];
+  const SH = {rhr:"ชีพจร", squat:"ลุกนั่ง", push:"วิดพื้น", plank:"แพลงก์", toe:"ก้มแตะเท้า", reach:"เอื้อมมือไขว้หลัง", march:"ย่ำเท้า"};
+  return st.qs.filter(q => q.id !== "pushStyle" && (S.skipped[q.id] || S.a[q.id] === undefined || S.a[q.id] === "")).map(q => SH[q.id] || q.label);
+}
 /* ---------- views ---------- */
 function viewStart(){
   const hasDraft = Object.keys(S.a).length > 0;
@@ -1335,6 +1343,7 @@ function viewResult(){
     <textarea class="copybox" id="copybox" readonly aria-label="สรุปผล">${esc(summaryText(r, ar))}</textarea>
   </section>
   <div class="row noprint">
+    ${skippedTests().length ? `<button class="btn btn-primary" id="redoskip" style="width:100%">กลับไปทำท่าที่ข้ามไป (${skippedTests().join(", ")})</button>` : ""}
     <button class="btn btn-ghost" id="edit">แก้คำตอบ</button>
     <button class="btn btn-ghost" id="reset">ให้เพื่อนลองในเครื่องนี้</button>
   </div>
@@ -1555,6 +1564,7 @@ document.addEventListener("click", e => {
   if(t.id === "go"){ SFX.next(); return go("step", S.view === "start" && Object.keys(S.a).length ? S.step : 0); }
   if(t.id === "reset"){ SFX.back(); S = {view:"start", step:0, a:{}, skipped:{}, err:""}; LB = {state:"idle", data:null, sex:null, band:null, msg:""}; return go("start"); }
   if(t.id === "edit") return go("step", 0);
+  if(t.id === "redoskip"){ SFX.tap(); return go("step", testStepIdx()); }
   if(t.id === "back"){ SFX.back(); } if(t.id === "back") return S.step === 0 ? go("start") : go("step", S.step - 1);
   if(t.id === "next"){
     const m = validate();
@@ -1593,8 +1603,8 @@ document.addEventListener("click", e => {
   if(t.dataset.unit){ SFX.tap(); const inp = t.closest(".inrow").querySelector("input"); const id = inp.dataset.in; const old = unitOf(id), nu = t.dataset.unit;
     if(old !== nu){ const v = Number(S.a[id]); if(S.a[id] !== undefined && S.a[id] !== "" && !isNaN(v)){ S.a[id] = String(Math.round((nu === "in" ? v/2.54 : v*2.54)*10)/10); } S.a[id+"Unit"] = nu; render(); }
     return; }
-  if(t.dataset.skip){ SFX.skip(); S.skipped[t.dataset.skip] = true; delete S.a[t.dataset.skip]; S.err = ""; return render(); }
-  if(t.dataset.unskip){ delete S.skipped[t.dataset.unskip]; return render(); }
+  if(t.dataset.skip){ SFX.skip(); linked(t.dataset.skip).forEach(k => { S.skipped[k] = true; delete S.a[k]; }); S.err = ""; return render(); }
+  if(t.dataset.unskip){ linked(t.dataset.unskip).forEach(k => { delete S.skipped[k]; }); return render(); }
   if(t.hasAttribute("data-tstart")){
     const box = t.closest(".timer"), clock = box.querySelector(".clock"), mode = box.dataset.timer, target = box.dataset.for;
     if(tick){ clearInterval(tick); tick = null; SFX.stop();
@@ -1626,6 +1636,9 @@ function fixState(){
   const p = S.a.pain; if(p != null && !Array.isArray(p)) S.a.pain = [String(p)];
   if(S.a.goal && !["fat","muscle","health","pain","sport"].includes(S.a.goal)) delete S.a.goal;
   if(!(S.step >= 0 && S.step < STEPS.length)) S.step = 0;
+  const sk = S.skipped, emp = k => S.a[k] === undefined || S.a[k] === "";
+  if(sk.push && !sk.pushStyle && emp("push")) sk.pushStyle = true;
+  if(sk.pushStyle && !sk.push && emp("pushStyle")) sk.push = true;
 }
 function start(data){
   if(data && data.a) S = Object.assign(S, data); else load();
