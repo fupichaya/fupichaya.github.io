@@ -295,6 +295,15 @@ textarea.copybox{width:100%;min-height:140px;font:13px var(--mono);border-radius
 .reveal.rare.s3 .rv-front{animation:rvrare 1.6s ease-in-out infinite}
 @keyframes rvrare{50%{filter:drop-shadow(0 0 40px #f5c84b)}}
 @media (prefers-reduced-motion: reduce){.rv-rays,.nx-to,.nx-arrow,.reveal.s1 .rv-in{animation:none}}
+
+.openguide{position:fixed;inset:0;z-index:70;background:rgba(3,6,5,.82);display:flex;align-items:flex-start;justify-content:center;padding:70px 16px 16px}
+.og-arrow{position:absolute;top:4px;right:14px;font-size:54px;line-height:1;color:#f5c84b;animation:ogb 1s ease-in-out infinite}
+@keyframes ogb{50%{transform:translate(4px,-6px)}}
+.og-box{background:var(--card,#fff);color:var(--ink,#111);border-radius:18px;padding:18px;max-width:380px;width:100%;font-size:15px;line-height:1.55}
+.og-box ol{margin:10px 0 6px 20px;padding:0}
+.og-box li{margin-bottom:6px}
+.og-dots{display:inline-block;font-weight:700;border:1.5px solid currentColor;border-radius:8px;padding:0 7px;line-height:1.3}
+.og-or{font-size:13px;color:var(--muted,#666);margin:8px 0 10px}
 </style>
 </head>
 <body>
@@ -1055,7 +1064,7 @@ function cardSection(r, ar){
     <h2>การ์ดร่างกายของ${nm}</h2>
     <p class="sub">แถบพลังมาจากคะแนนจริงของคุณ เก็บไว้เทียบตอนทดสอบรอบหน้า หรือแชร์ให้เพื่อนลองบ้าง</p>
     <div class="pcard">${cardSVG(archKey(ar), r, ar, nm)}</div>
-    ${igBanner("ผลของคุณจะไปอยู่ในเบราว์เซอร์ด้วย แชร์แล้วกลับมาดูได้ไม่หาย")}
+    ${igBanner("")}
     <button class="btn btn-ig" id="savecard" type="button" style="width:100%;margin-top:12px">แชร์การ์ดลงสตอรี่ IG</button>
     <div class="linkbox"><div class="lb-k">ลิงก์แบบทดสอบ ส่งให้เพื่อนเล่นต่อ</div><div class="lb-url">${SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "")}</div>
       <div class="row2"><button class="btn" id="copylink2" type="button">คัดลอกลิงก์</button><button class="btn btn-primary" id="sharelink" type="button">ส่งลิงก์ให้เพื่อน</button></div></div>
@@ -1069,11 +1078,39 @@ function openExternal(){
     if(/android/i.test(ua)){ const c = S.view === "result" ? encState() : ""; location.href = "intent://" + location.host + location.pathname + (c ? "?r=" + encodeURIComponent(c) : "") + "#Intent;scheme=https;end"; }
     else location.href = "x-safari-" + u;
   }catch(e){}
-  setTimeout(() => { const t = $("#toast2"); if(t) t.innerHTML = "ถ้าไม่เด้ง กด <b>⋯</b> มุมขวาบน แล้วเลือก <b>“เปิดในเบราว์เซอร์ภายนอก”</b>"; }, 1200);
+  // ถ้าแอปไม่ยอมเด้ง (หน้ายังแสดงอยู่) โชว์วิธีกดเมนูเองแบบมีลูกศรชี้
+  setTimeout(() => { if(!document.hidden) showOpenGuide(); }, 900);
+}
+
+function showOpenGuide(){
+  if($(".openguide")) return;
+  const android = /android/i.test(navigator.userAgent || "");
+  const g = document.createElement("div");
+  g.className = "openguide";
+  g.innerHTML = `<div class="og-arrow">↗</div>
+    <div class="og-box">
+      <b>แอป IG ไม่ยอมให้เด้งอัตโนมัติ</b>
+      <ol><li>กด <span class="og-dots">${android ? "⋮" : "⋯"}</span> มุมขวาบนของจอ</li>
+      <li>เลือก <b>“เปิดในเบราว์เซอร์ภายนอก”</b><br><small>(Open in external browser${android ? "" : " / Open in Safari"})</small></li></ol>
+      <p class="og-or">หรือคัดลอกลิงก์ไปวางใน ${android ? "Chrome" : "Safari"} เอง${S.view === "result" ? " ผลของคุณติดไปด้วย" : ""}</p>
+      <button class="btn btn-primary" id="og-copy" type="button" style="width:100%">คัดลอกลิงก์</button>
+      <button class="btn btn-ghost" id="og-close" type="button" style="width:100%;margin-top:8px">ทำต่อในแอป IG ก็ได้ ผลไม่หาย</button>
+    </div>`;
+  document.body.appendChild(g);
+  g.addEventListener("click", e => {
+    if(e.target.id === "og-copy"){
+      const u = S.view === "result" ? location.origin + location.pathname + "#r=" + encState() : location.origin + location.pathname;
+      try{ navigator.clipboard.writeText(u); }catch(err){}
+      try{ const ta = document.createElement("textarea"); ta.value = u; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }catch(err){}
+      e.target.textContent = "คัดลอกแล้ว ✓ เปิด " + (android ? "Chrome" : "Safari") + " แล้ววางในช่องที่อยู่";
+      return;
+    }
+    if(e.target.id === "og-close" || e.target === g) g.remove();
+  });
 }
 function igBanner(why){
   if(!IN_IG) return "";
-  return `<div class="alert igbanner" style="margin-top:12px"><b>กำลังเปิดในแอป IG</b> เปิดในเบราว์เซอร์จะลื่นกว่าและข้อมูลไม่หาย ${why}
+  return `<div class="alert igbanner" style="margin-top:12px"><b>กำลังเปิดในแอป IG</b> ทำต่อในนี้ได้ ผลไม่หาย หรือเปิดในเบราว์เซอร์ก็ได้ ${why}
     <button class="btn btn-primary" id="openext" type="button" style="width:100%;margin-top:10px">เปิดใน${/android/i.test(navigator.userAgent || "") ? " Chrome" : " Safari"}</button><div class="meta" id="toast2" style="margin-top:6px"></div></div>`;
 }
 const IN_IG = (() => { try{ return /Instagram|FBAN|FBAV/i.test(navigator.userAgent); }catch(e){ return false; } })();
@@ -1242,7 +1279,7 @@ function viewStart(){
     <p class="lead">เล่นแป๊บเดียว 5 นาที ตอบคำถามนิดหน่อย ลองท่าง่ายๆ ที่บ้าน แล้วมาดูกันว่าร่างกายคุณเป็นสายไหน และแข็งแรงแค่ไหนเมื่อเทียบกับคนวัยเดียวกัน</p>
     <div class="chips"><span class="chip">ความแข็งแรง</span><span class="chip">หัวใจและปอด</span><span class="chip">ความยืดหยุ่น</span><span class="chip">องค์ประกอบร่างกาย</span><span class="chip">ไลฟ์สไตล์</span></div>
   </section>
-  ${igBanner("ทำแบบทดสอบในเบราว์เซอร์ ผลจะถูกเก็บไว้ให้")}
+  ${igBanner("")}
   <section class="card">
     <h2>เล่นแล้วได้อะไร</h2>
     <div class="steps-list">
