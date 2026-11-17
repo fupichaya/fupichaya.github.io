@@ -304,6 +304,14 @@ textarea.copybox{width:100%;min-height:140px;font:13px var(--mono);border-radius
 .og-box li{margin-bottom:6px}
 .og-dots{display:inline-block;font-weight:700;border:1.5px solid currentColor;border-radius:8px;padding:0 7px;line-height:1.3}
 .og-or{font-size:13px;color:var(--muted,#666);margin:8px 0 10px}
+
+.vidov{position:fixed;inset:0;z-index:65;background:rgba(3,6,5,.92);display:flex;align-items:center;justify-content:center;padding:14px}
+.vd-box{position:relative;width:min(92vw,400px);display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.vd-box canvas{width:100%;max-height:68vh;object-fit:contain;border-radius:18px;background:#000;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.vd-bar{height:6px;border-radius:6px;background:#20382c;overflow:hidden}.vd-bar i{display:block;height:100%;width:0;background:#3fd18f}
+.vd-msg{color:#e8f5ee;text-align:center;font-size:14px}
+.vd-btns{grid-template-columns:1fr;gap:8px}
+.vd-x{position:absolute;top:-6px;right:-6px;width:36px;height:36px;border-radius:50%;border:0;background:#fff;color:#111;font-size:18px;font-weight:700}
 </style>
 </head>
 <body>
@@ -1180,7 +1188,7 @@ function showAfterShare(){
   out.innerHTML = igSteps(true);
   setTimeout(() => { const b = $("#savecard"); if(b) b.scrollIntoView({block:"start"}); }, 50);
 }
-async function saveCard(){
+async function savePng(){
   const out = $("#cardout"), btn = $("#savecard");
   copyLink(); // คัดลอกทันทีตอนกด (ก่อนรออะไร) ไม่งั้น iOS ไม่ยอมให้คัดลอก
   S.afterShare = Date.now(); save(); syncHash(); // ถ้าเบราว์เซอร์รีโหลดหน้าตอนกลับมา จะพากลับมาที่ลิงก์
@@ -1199,6 +1207,146 @@ async function saveCard(){
   }catch(err){
     out.innerHTML = `<p class="meta" style="margin-top:10px;text-align:center">สร้างรูปไม่สำเร็จ ลองแคปหน้าจอการ์ดแทนได้เลย</p>` + igSteps(false).replace(/<li>[^]*?<\/li>/, "<li>แคปหน้าจอการ์ด แล้วกดปุ่มเปิด IG สตอรี่ เลือกรูป</li>");
   }finally{ btn.disabled = false; btn.textContent = "แชร์การ์ดลงสตอรี่ IG"; }
+}
+
+/* ---------- วิดีโอสตอรี่: การ์ดหมุนสุ่ม แล้วเปิดการ์ดของฉัน ---------- */
+function vidMime(){
+  try{
+    if(typeof MediaRecorder !== "function" || !HTMLCanvasElement.prototype.captureStream) return "";
+    const list = ["video/mp4;codecs=avc1.42E01E", "video/mp4;codecs=avc1", "video/mp4"];
+    for(const m of list){ if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m; }
+  }catch(e){}
+  return "";
+}
+function svgImg(svg){
+  return new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+}
+async function saveCard(){
+  copyLink(); // คัดลอกทันทีตอนกด
+  S.afterShare = Date.now(); save(); syncHash();
+  const mime = vidMime();
+  if(!mime) return savePng();
+  try{ await makeStoryVideo(mime); }catch(err){ const o = $(".vidov"); if(o) o.remove(); document.body.style.overflow = ""; savePng(); }
+}
+async function makeStoryVideo(mime){
+  const r = compute(), ar = archetype(r), fk = archKey(ar), FC = CARD[fk] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ";
+  const ov = document.createElement("div");
+  ov.className = "vidov";
+  ov.innerHTML = `<div class="vd-box"><canvas width="720" height="1280"></canvas>
+    <div class="vd-bar"><i></i></div><div class="vd-msg">กำลังทำวิดีโอสตอรี่…</div>
+    <div class="vd-btns" style="display:none"><button class="btn btn-ig" id="vd-share" type="button">แชร์วิดีโอลงสตอรี่ IG</button>
+    <button class="btn" id="vd-png" type="button">ใช้เป็นรูปแทน</button></div>
+    <button class="vd-x" id="vd-close" type="button" aria-label="ปิด">✕</button></div>`;
+  document.body.appendChild(ov); document.body.style.overflow = "hidden";
+  const cv = ov.querySelector("canvas"), x = cv.getContext("2d"), W = 720, H = 1280;
+  if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  // เตรียมรูปการ์ด: ทุกสาย + การ์ดของฉัน
+  const keys = Object.keys(ARCH).filter(k => k.indexOf("evo_") !== 0 && k !== speciesOf(fk));
+  const imgs = {};
+  await Promise.all(keys.concat([fk]).map(async k => { try{ imgs[k] = await svgImg(cardSVG(k, r, ARCH[k], nm)); }catch(e){} }));
+  if(!imgs[fk]) throw new Error("no card");
+  const pool = keys.filter(k => imgs[k]);
+  // ตารางสลับการ์ด: เร็วแล้วค่อยๆ ช้าลง
+  const swaps = []; let t = 0, gap = 70, i = 0;
+  while(t < 3600){ swaps.push({t, k: pool[(i * 7 + 3) % pool.length]}); t += gap; gap = Math.min(520, gap * 1.13); i++; }
+  const REEL = t; swaps.push({t: REEL, k: fk});
+  const TOTAL = REEL + 3600;
+  const F = "'IBM Plex Sans Thai','Chakra Petch','Thonburi',sans-serif";
+  const host = SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "");
+  const parts = Array.from({length: 46}, (_, j) => ({a: j / 46 * Math.PI * 2 + (j % 3) * 0.4, v: 260 + (j * 53) % 320, s: 5 + j % 6, c: ["#f5c84b", "#fff", FC.acc, "#ff7ab8"][j % 4]}));
+  const cw = 470, ch = Math.round(cw * 560 / 340), cx = W / 2, cy = 650;
+  function text(tx, y, size, color, w){ x.font = `${w || 700} ${size}px ${F}`; x.fillStyle = color; x.textAlign = "center"; x.fillText(tx, W / 2, y); }
+  function draw(ms){
+    const rev = ms >= REEL, rt = ms - REEL;
+    const bgc = rev ? FC.bg : "#0b1310";
+    x.fillStyle = "#05080a"; x.fillRect(0, 0, W, H);
+    const g = x.createRadialGradient(cx, cy, 40, cx, cy, 820); g.addColorStop(0, bgc); g.addColorStop(1, "#05080a");
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    if(rev){ // แสงหมุน
+      x.save(); x.translate(cx, cy); x.rotate(rt / 2600); x.globalAlpha = Math.min(1, rt / 400) * 0.22; x.fillStyle = FC.acc;
+      for(let j = 0; j < 16; j++){ x.rotate(Math.PI / 8); x.beginPath(); x.moveTo(0, 0); x.lineTo(-60, -1100); x.lineTo(60, -1100); x.closePath(); x.fill(); }
+      x.restore();
+    }
+    // หัวเรื่อง
+    if(!rev) text("ร่างกายฉันเป็นสายไหน?", 150, 46, "#e8f5ee");
+    else { const a = Math.min(1, rt / 500); x.globalAlpha = a; text(`${nm} คือ`, 120, 34, "#cfe"); text(ar.t, 180, 54, FC.acc, 800); x.globalAlpha = 1; }
+    // การ์ด
+    let k = fk, sx = 1, sc = 1, shake = 0;
+    if(!rev){
+      let cur = swaps[0]; for(const sw of swaps){ if(sw.t <= ms) cur = sw; else break; }
+      const nx = swaps[swaps.indexOf(cur) + 1], len = nx ? nx.t - cur.t : 100, p = (ms - cur.t) / len;
+      k = cur.k; sx = Math.max(0.06, Math.min(1, p * 2.2)); // พลิกเข้ามาทีละใบ
+      shake = ms > REEL - 900 ? Math.sin(ms / 18) * (ms - REEL + 900) / 90 : 0;
+    } else {
+      sx = Math.min(1, rt / 160); sc = 1 + Math.max(0, 0.12 - rt / 2500) ;
+    }
+    const im = imgs[k] || imgs[fk];
+    x.save(); x.translate(cx + shake, cy); x.scale(sx * sc, sc);
+    if(rev){ x.shadowColor = FC.acc; x.shadowBlur = 50; }
+    x.drawImage(im, -cw / 2, -ch / 2, cw, ch);
+    x.restore();
+    if(!rev){ // เครื่องหมาย ? ลอยบนการ์ดที่กำลังหมุน
+      x.globalAlpha = 0.85; text("?", cy + 40, 150, "rgba(255,255,255,.9)", 800); x.globalAlpha = 1;
+    }
+    // ประกายแตก
+    if(rev && rt < 2200){
+      const pr = rt / 1000;
+      parts.forEach(q => { const d = q.v * pr, yy = cy + Math.sin(q.a) * d + 160 * pr * pr; x.globalAlpha = Math.max(0, 1 - rt / 2200); x.fillStyle = q.c;
+        x.fillRect(cx + Math.cos(q.a) * d, yy, q.s, q.s * 1.6); });
+      x.globalAlpha = 1;
+    }
+    // แฟลช
+    if(rev && rt < 450){ x.fillStyle = `rgba(255,255,255,${(1 - rt / 450) * 0.95})`; x.fillRect(0, 0, W, H); }
+    // ท้ายจอ
+    text("เช็กร่างกาย 5 นาที กับโค้ชฟูจิ", 1150, 30, "#e8f5ee");
+    text(rev ? "แตะลิงก์ด้านล่าง ทายการ์ดของคุณ ↓" : "กำลังสุ่มการ์ด…", 1196, 26, rev ? FC.acc : "#8fb0a0", 500);
+    text(host, 1246, 22, "rgba(232,245,238,.55)", 500);
+  }
+  draw(0);
+  const stream = cv.captureStream(30), rec = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: 6000000}), chunks = [];
+  rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+  const done = new Promise(res => rec.onstop = res);
+  rec.start(250);
+  const bar = ov.querySelector(".vd-bar i"), t0 = performance.now();
+  let stopped = false, ticked = -1;
+  await new Promise(res => {
+    const step = () => {
+      if(stopped) return res();
+      const ms = performance.now() - t0;
+      draw(Math.min(ms, TOTAL)); bar.style.width = Math.min(100, ms / TOTAL * 100) + "%";
+      const sw = swaps.filter(s => s.t <= ms).length; if(sw !== ticked && ms < REEL){ ticked = sw; try{ SFX.tick(); }catch(e){} }
+      if(ms >= REEL && ticked !== -2){ ticked = -2; try{ SFX.result(); }catch(e){} }
+      if(ms >= TOTAL + 300) return res();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    ov.querySelector("#vd-close").onclick = () => { stopped = true; };
+  });
+  rec.stop(); await done; stream.getTracks().forEach(tk => tk.stop());
+  if(stopped){ ov.remove(); document.body.style.overflow = ""; return; }
+  const type = mime.split(";")[0], blob = new Blob(chunks, {type});
+  if(!blob.size) throw new Error("empty video");
+  const file = new File([blob], "fuji-card.mp4", {type});
+  ov.querySelector(".vd-msg").textContent = "วิดีโอพร้อมแล้ว! ลิงก์คัดลอกไว้ให้แล้ว ลงสตอรี่แล้วใส่สติกเกอร์ลิงก์";
+  ov.querySelector(".vd-bar").style.display = "none";
+  ov.querySelector(".vd-btns").style.display = "grid";
+  // เล่นวนให้ดูเป็นตัวอย่าง
+  let loop = true; const t1 = performance.now();
+  const replay = () => { if(!loop) return; draw((performance.now() - t1) % (TOTAL + 600)); requestAnimationFrame(replay); }; replay();
+  const close = () => { loop = false; ov.remove(); document.body.style.overflow = ""; };
+  ov.querySelector("#vd-close").onclick = close;
+  ov.querySelector("#vd-png").onclick = () => { close(); savePng(); };
+  ov.querySelector("#vd-share").onclick = async () => {
+    copyLink();
+    const out = $("#cardout");
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:"การ์ดร่างกายของฉัน"}); close(); if(out){ out.innerHTML = igSteps(true); } return; }
+      catch(err){ if(err && err.name === "AbortError") return; }
+    }
+    // แชร์ไฟล์ไม่ได้: ให้ดาวน์โหลดวิดีโอแทน
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "fuji-card.mp4"; document.body.appendChild(a); a.click(); a.remove();
+    ov.querySelector(".vd-msg").textContent = "บันทึกวิดีโอแล้ว เปิด IG สตอรี่ แล้วเลือกวิดีโอนี้";
+  };
 }
 
 function skipIn(k){
