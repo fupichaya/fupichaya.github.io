@@ -370,7 +370,9 @@ function rhrNorm(v, age, sex){
   return {i, lv:RHR_LV[i], next, group:`${sexTh()} ${row[1] ? `${row[0]}–${row[1]}` : `${row[0]} ปีขึ้นไป`}${row[1] ? " ปี" : ""}${edge}`, score:[100,90,80,70,55,40,25][i]};
 }
 
-function compute(){
+function compute(zeroSkip){
+  // zeroSkip: ใช้คิดคะแนนตารางอันดับ ท่าที่ข้ามนับเป็น 0 ทีละท่า (ข้ามท่าที่อ่อนแล้วคะแนนสูงขึ้นไม่ได้)
+  const Z = v => zeroSkip && (v == null || isNaN(v)) ? 0 : v;
   const a = S.a, age = n("age") || 30, female = a.sex === "f";
   // strength
   const sx = female ? "f" : "m";
@@ -382,13 +384,13 @@ function compute(){
     else { const mult = {full:1, knee:0.5, wall:0.25}[c("pushStyle")]; push = bandUp(n("push") * mult, female ? [2,6,12,20] : [5,12,20,30]); }
   }
   const pl = n("plank");
-  const strength = avg([sqN ? sqN.score : null, push, pl!=null?bandUp(pl,[20,45,75,120]):null]);
+  const strength = avg([Z(sqN ? sqN.score : null), Z(push), Z(pl!=null?bandUp(pl,[20,45,75,120]):null)]);
   // cardio
   const st = c("march"), rhr = n("rhr"), rhrN = rhr != null ? rhrNorm(rhr, age, sx) : null;
-  const cardio = avg([st ? {1:20,2:45,3:70,4:95}[st] : null, rhrN ? rhrN.score : null,
-                      a.move != null && (st || rhr!=null) ? {0:30,1:50,2:75,3:95}[a.move] : null]);
+  const cardio = avg([Z(st ? {1:20,2:45,3:70,4:95}[st] : null), Z(rhrN ? rhrN.score : null),
+                      a.move != null && (st || rhr!=null || zeroSkip) ? {0:30,1:50,2:75,3:95}[a.move] : null]);
   // flexibility
-  const flex = avg([c("toe") ? Number(c("toe"))*20 : null, c("reach") ? {1:30,2:55,3:80,4:100}[c("reach")] : null]);
+  const flex = avg([Z(c("toe") ? Number(c("toe"))*20 : null), Z(c("reach") ? {1:30,2:55,3:80,4:100}[c("reach")] : null)]);
   // body composition (Asian BMI cut-offs)
   const w = n("weight"), h = n("height"), wa = n("waist") != null ? n("waist") * (unitOf("waist") === "in" ? 2.54 : 1) : null;
   let bmi = null, bmiS = null, whr = null, whrS = null;
@@ -1175,8 +1177,8 @@ function deviceId(){
 }
 let LB = {state:"idle", data:null, sex:null, band:null, msg:""};
 function lbEligible(r){ return r.dom[0].s != null && r.dom[1].s != null && r.dom[2].s != null; }
-// คะแนนในตารางอันดับ: ด้านที่ไม่ได้ทดสอบนับเป็น 0 เพื่อความยุติธรรม
-function lbScore(r){ return Math.round(r.dom.reduce((t,d) => t + (d.s || 0), 0) / r.dom.length); }
+// คะแนนในตารางอันดับ: ท่าที่ข้ามนับเป็น 0 ทีละท่า ทำครบเท่านั้นถึงได้เท่าคะแนนในหน้าผล
+function lbScore(){ const z = compute(true); return Math.round(z.dom.reduce((t,d) => t + (d.s || 0), 0) / z.dom.length); }
 // ตารางอันดับทำงานเฉพาะหน้าที่เปิดผ่านลิงก์ Google (QR) เท่านั้น
 const LB_HOST_OK = (() => { try { return !/claude/i.test(location.hostname); } catch(e){ return true; } })();
 function lbSection(r, ar){
@@ -1186,10 +1188,10 @@ function lbSection(r, ar){
   if(!LB.sex){ LB.sex = mySex; LB.band = myBand; }
   const grp = `${LB.sex === "f" ? "ผู้หญิง" : "ผู้ชาย"} ${BAND_LABEL[LB.band]}`;
   let form = "";
-  const missing = r.dom.slice(0,3).filter(d => d.s == null).map(d => d.name);
+  const missing = skippedTests();
   form = `<div class="lb-form">
-      <div class="meta">ส่งคะแนน <b>${lbScore(r)}</b> เข้าอันดับให้อัตโนมัติแล้ว ในชื่อ <b>${esc(lbName())}</b> · ขึ้นแค่ชื่อ คะแนนรวม และฉายาร่างกาย ไม่แสดงอายุ น้ำหนัก หรือข้อมูลสุขภาพ</div>
-      ${missing.length ? `<div class="alert">ด้านที่ไม่ได้ทดสอบ (${missing.join(", ")}) นับเป็น 0 ในตารางอันดับ คะแนนอันดับเลยต่ำกว่าคะแนนในหน้านี้ กด “แก้คำตอบ” แล้วกลับไปทำท่าที่ข้ามไว้ อันดับจะขยับขึ้นเอง</div>` : ""}
+      <div class="meta">ส่งคะแนน <b>${lbScore()}</b> เข้าอันดับให้อัตโนมัติแล้ว ในชื่อ <b>${esc(lbName())}</b> · ขึ้นแค่ชื่อ คะแนนรวม และฉายาร่างกาย ไม่แสดงอายุ น้ำหนัก หรือข้อมูลสุขภาพ</div>
+      ${missing.length ? `<div class="alert">ท่าที่ข้าม (${missing.join(", ")}) นับเป็น 0 ในตารางอันดับ คะแนนอันดับ ${lbScore()} เลยต่ำกว่าคะแนนในหน้านี้ (${nn(r.overall, "-")}) ทำครบทุกท่าแล้วสองคะแนนจะเท่ากัน <button class="skip" id="redoskip">กลับไปทำท่าที่ข้าม</button></div>` : ""}
       <div class="inrow"><input type="text" id="lb-name" maxlength="20" value="${esc(S.lbName || S.a.name || "")}" placeholder="${esc(lbAlias())}" aria-label="ชื่อที่แสดงในอันดับ"><button class="btn btn-ghost" id="lb-send" style="min-height:46px">เปลี่ยนชื่อ</button></div>
     </div>`;
   let board = "";
@@ -1246,7 +1248,7 @@ function lbSend(rename){
   if(rename){ const v = ($("#lb-name").value || "").trim(); S.lbName = v; }
   const r = compute(), ar = archetype(r);
   if(r.overall == null) return;
-  const body = {id: deviceId(), name: lbName(), sex: S.a.sex === "f" ? "f" : "m", band: bandOf(n("age") || 30), score: lbScore(r), type: ar.t};
+  const body = {id: deviceId(), name: lbName(), sex: S.a.sex === "f" ? "f" : "m", band: bandOf(n("age") || 30), score: lbScore(), type: ar.t};
   const sig = JSON.stringify(body);
   LB.sex = body.sex; LB.band = body.band; LB.state = "loading"; lbRender();
   lbFetch({url: LEADERBOARD_URL, init: {method: "POST", body: JSON.stringify(body)}})
@@ -1255,7 +1257,7 @@ function lbSend(rename){
 }
 function lbAuto(){
   const r = compute(); if(r.overall == null) return false;
-  const sig = JSON.stringify({id: deviceId(), name: lbName(), sex: S.a.sex === "f" ? "f" : "m", band: bandOf(n("age") || 30), score: lbScore(r), type: archetype(r).t});
+  const sig = JSON.stringify({id: deviceId(), name: lbName(), sex: S.a.sex === "f" ? "f" : "m", band: bandOf(n("age") || 30), score: lbScore(), type: archetype(r).t});
   if(S.lbSig === sig) return false;
   lbSend(false); return true;
 }
