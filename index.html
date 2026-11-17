@@ -1234,7 +1234,7 @@ async function saveCard(){
   finally{ try{ if(ac) setTimeout(() => ac.close(), 1500); }catch(e){} }
 }
 // เสียงในวิดีโอ: ติ๊กตอนการ์ดหมุน, เสียงลุ้นตอนสั่น, เสียงเปิดการ์ด
-function storySounds(ac, outs, t0, ticks, shakeAt, revealAt, rare){
+function storySounds(ac, outs, t0, ticks, shakeAt, revealAt, rare, totalMs){
   const tone = (at, f, dur, type, vol, f2) => {
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = type || "sine"; o.frequency.setValueAtTime(f, at); if(f2) o.frequency.exponentialRampToValueAtTime(f2, at + dur);
@@ -1258,6 +1258,20 @@ function storySounds(ac, outs, t0, ticks, shakeAt, revealAt, rare){
   const notes = rare ? [523, 659, 784, 1047, 1319, 1568] : [523, 659, 784, 1047];
   notes.forEach((f, k) => { tone(rv + 0.08 + k * 0.09, f, 0.5, "triangle", 0.22); tone(rv + 0.08 + k * 0.09, f * 2, 0.35, "sine", 0.07); });
   for(let k = 0; k < 8; k++) tone(rv + 0.6 + k * 0.07, 2000 + (k * 337) % 1800, 0.12, "sine", 0.06);  // วิ้งๆ
+  // เสียงต่อเนื่องตลอดคลิป: iPhone ตัดวิดีโอจบตอนเสียงเงียบ เลยต้องมีเสียงจนจบ
+  const end = t0 + (totalMs || 15000) / 1000;
+  const hum = ac.createOscillator(), hg = ac.createGain(); hum.frequency.value = 55; hg.gain.value = 0.004;
+  hum.connect(hg); outs.forEach(o => hg.connect(o)); hum.start(t0); hum.stop(end + 0.3);
+  // ดนตรีฉลองเบาๆ หลังเปิดการ์ดจนจบ
+  const chords = [[262, 330, 392], [220, 277, 330], [175, 220, 262], [196, 247, 294]];
+  let k = 0;
+  for(let at = rv + 1.2; at < end - 0.2; at += 1.0, k++){
+    const c = chords[Math.floor(k / 2) % chords.length];
+    c.forEach(f => tone(at, f, 0.95, "triangle", 0.05));
+    tone(at, c[0] / 2, 0.3, "sine", 0.18);                         // เบส
+    tone(at + 0.5, 3000, 0.04, "square", 0.025);                   // ฉิ่ง
+    if(k % 2 === 1) tone(at + 0.25, c[2] * 2, 0.2, "sine", 0.05);  // ทำนองเบาๆ
+  }
 }
 async function makeStoryVideo(mime, ac){
   const r = compute(), ar = archetype(r), fk = archKey(ar), FC = CARD[fk] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ", nmRaw = String(S.a.name || "คุณ").slice(0, 20);
@@ -1371,7 +1385,7 @@ async function makeStoryVideo(mime, ac){
   rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
   const done = new Promise(res => rec.onstop = res);
   rec.start(250);
-  if(ac && dest){ const outs = [dest]; if(soundOn) outs.push(ac.destination); try{ storySounds(ac, outs, ac.currentTime + 0.05, ticks, SHAKE, REV, rare); }catch(e){} }
+  if(ac && dest){ const outs = [dest]; if(soundOn) outs.push(ac.destination); try{ storySounds(ac, outs, ac.currentTime + 0.05, ticks, SHAKE, REV, rare, TOTAL); }catch(e){} }
   const bar = ov.querySelector(".vd-bar i"), t0 = performance.now() + 50;
   let stopped = false;
   await new Promise(res => {
@@ -1396,6 +1410,7 @@ async function makeStoryVideo(mime, ac){
   cv.replaceWith(vid); try{ vid.play(); }catch(e){}
   vid.onclick = () => { vid.muted = !vid.muted; try{ vid.play(); }catch(e){} };
   ov.querySelector(".vd-msg").textContent = "วิดีโอพร้อมแล้ว! แตะวิดีโอเพื่อฟังเสียง · ลิงก์คัดลอกไว้ให้แล้ว";
+  vid.onloadedmetadata = () => { if(isFinite(vid.duration) && vid.duration > 0) ov.querySelector(".vd-msg").textContent = `วิดีโอพร้อมแล้ว! (${Math.round(vid.duration)} วินาที) แตะวิดีโอเพื่อฟังเสียง · ลิงก์คัดลอกไว้ให้แล้ว`; };
   ov.querySelector(".vd-bar").style.display = "none";
   ov.querySelector(".vd-btns").style.display = "grid";
   const close = () => { try{ vid.pause(); }catch(e){} ov.remove(); document.body.style.overflow = ""; };
