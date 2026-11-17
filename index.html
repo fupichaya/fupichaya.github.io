@@ -1260,7 +1260,7 @@ function storySounds(ac, outs, t0, ticks, shakeAt, revealAt, rare){
   for(let k = 0; k < 8; k++) tone(rv + 0.6 + k * 0.07, 2000 + (k * 337) % 1800, 0.12, "sine", 0.06);  // วิ้งๆ
 }
 async function makeStoryVideo(mime, ac){
-  const r = compute(), ar = archetype(r), fk = archKey(ar), FC = CARD[fk] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ";
+  const r = compute(), ar = archetype(r), fk = archKey(ar), FC = CARD[fk] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ", nmRaw = String(S.a.name || "คุณ").slice(0, 20);
   const rare = !!(FC.tier || FC.rare);
   const ov = document.createElement("div");
   ov.className = "vidov";
@@ -1284,7 +1284,23 @@ async function makeStoryVideo(mime, ac){
   const ticks = []; { let last = 0; for(let ms = 0; ms <= SPIN; ms += 4){ const k = Math.floor((ang(ms) + Math.PI / 2) / Math.PI); if(k > last){ ticks.push(ms); last = k; } } }
   const parts = Array.from({length: 54}, (_, j) => ({a: j / 54 * Math.PI * 2 + (j % 3) * 0.4, v: 260 + (j * 53) % 340, s: 5 + j % 6, c: ["#f5c84b", "#fff", FC.acc, "#ff7ab8"][j % 4]}));
   const cw = 470, ch = Math.round(cw * 560 / 340), cx = W / 2, cy = 650;
-  function text(tx, y, size, color, w){ x.font = `${w || 700} ${size}px ${F}`; x.fillStyle = color; x.textAlign = "center"; x.fillText(tx, W / 2, y); }
+  // ตัวหนังสือไทยบน canvas ของ iPhone จัดกึ่งกลางเพี้ยน เลยวาดตัวหนังสือเป็นรูป SVG (จัดกลางด้วย text-anchor) แล้วค่อยแปะ
+  const TXT = {}, want = [];
+  function textAt(tx, mx, y, size, color, w){
+    const key = [tx, size, color, w || 700].join("|"), im = TXT[key];
+    if(im && im !== 1){ x.drawImage(im, mx - 360, y - size * 1.15, 720, Math.ceil(size * 1.6)); return; }
+    if(!im){ TXT[key] = 1; want.push([key, tx, size, color, w || 700]); }
+    x.font = `${w || 700} ${size}px ${F}`; x.fillStyle = color; x.textAlign = "left"; x.fillText(tx, mx - x.measureText(tx).width / 2, y);
+  }
+  function text(tx, y, size, color, w){ textAt(tx, W / 2, y, size, color, w); }
+  async function loadTexts(){
+    const jobs = want.splice(0).map(async q => {
+      const [key, tx, size, color, w] = q, h = Math.ceil(size * 1.6);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="${h}" viewBox="0 0 720 ${h}"><text x="360" y="${(size * 1.15).toFixed(1)}" text-anchor="middle" font-size="${size}" font-weight="${w}" fill="${color}" font-family="'IBM Plex Sans Thai','Thonburi','Leelawadee UI',sans-serif">${esc(tx)}</text></svg>`;
+      try{ TXT[key] = await svgImg(svg); }catch(e){}
+    });
+    await Promise.all(jobs);
+  }
   function rr(px, py, w, h, rad){ x.beginPath(); x.moveTo(px + rad, py); x.arcTo(px + w, py, px + w, py + h, rad); x.arcTo(px + w, py + h, px, py + h, rad); x.arcTo(px, py + h, px, py, rad); x.arcTo(px, py, px + w, py, rad); x.closePath(); }
   function back(glow){ // หลังการ์ด
     const w = cw, h = ch;
@@ -1295,8 +1311,8 @@ async function makeStoryVideo(mime, ac){
     for(let k = 0; k < 7; k++){ x.fillStyle = "rgba(63,209,143,.10)"; x.beginPath(); x.arc(0, 0, 60 + k * 32, 0, Math.PI * 2); x.fill(); }
     x.fillStyle = "#1b4a35"; x.beginPath(); x.arc(0, 0, 120, 0, Math.PI * 2); x.fill(); x.lineWidth = 4; x.strokeStyle = "#3fd18f"; x.stroke();
     x.font = `800 170px ${F}`; x.fillStyle = "#3fd18f"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("?", 0, 8); x.textBaseline = "alphabetic";
-    x.font = `700 26px ${F}`; x.fillStyle = "#8fd0b0"; x.fillText("FUJI BODY CARD", 0, h / 2 - 70);
-    x.font = `500 20px ${F}`; x.fillStyle = "rgba(143,208,176,.7)"; x.fillText("18 สาย · หายากมี RARE / LEGENDARY", 0, -h / 2 + 70);
+    textAt("FUJI BODY CARD", 0, h / 2 - 70, 26, "#8fd0b0", 700);
+    textAt("18 สาย · หายากมี RARE / LEGENDARY", 0, -h / 2 + 70, 20, "rgba(143,208,176,.7)", 500);
   }
   function draw(ms){
     const rev = ms >= REV, rt = ms - REV;
@@ -1313,7 +1329,7 @@ async function makeStoryVideo(mime, ac){
     }
     // หัวเรื่อง
     if(!rev){ text("ร่างกายฉันเป็นสายไหน?", 140, 46, "#e8f5ee"); text(ms < SHAKE ? "กำลังสุ่มการ์ด…" : "ลุ้น…", 192, 30, "#8fd0b0", 500); }
-    else { const a = Math.min(1, rt / 450); x.globalAlpha = a; text(rare ? `ว้าว! ${nm} ได้การ์ด ${FC.tier || "RARE"}` : `${nm} คือ`, 120, 32, rare ? "#f5c84b" : "#cfe"); text(ar.t, 184, 54, FC.acc, 800); x.globalAlpha = 1; }
+    else { const a = Math.min(1, rt / 450); x.globalAlpha = a; text(rare ? `ว้าว! ${nmRaw} ได้การ์ด ${FC.tier || "RARE"}` : `${nmRaw} คือ`, 120, 32, rare ? "#f5c84b" : "#cfe"); text(ar.t, 184, 54, FC.acc, 800); x.globalAlpha = 1; }
     // การ์ด
     x.save(); x.translate(cx, cy);
     if(ms < SPIN){
@@ -1339,6 +1355,9 @@ async function makeStoryVideo(mime, ac){
     text(rev ? "แตะลิงก์ด้านล่าง ลุ้นการ์ดของคุณ ↓" : "การ์ดของฉันคือตัวไหน?", 1196, 26, rev ? FC.acc : "#8fb0a0", 500);
     text(host, 1246, 22, "rgba(232,245,238,.55)", 500);
   }
+  // วาดล่วงหน้าทุกช่วง เพื่อเตรียมรูปตัวหนังสือให้ครบก่อนอัด
+  [0, SHAKE + 10, REV + 50, REV + 900].forEach(ms => draw(ms));
+  await loadTexts();
   draw(0);
   const vstream = cv.captureStream(30);
   let dest = null;
