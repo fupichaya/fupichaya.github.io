@@ -517,7 +517,7 @@ const ARCH = {
   zero:{t:"ลูกเจี๊ยบเพิ่งฟัก", d:"ทุกด้านยังมีพื้นที่ให้พัฒนา นี่คือจุดเริ่มต้นที่ดีที่สุด เพราะคนที่เริ่มจากตรงนี้จะเห็นการเปลี่ยนแปลงเร็วและชัดที่สุด สิ่งสำคัญคือเริ่มเบาและทำต่อเนื่อง",
         p:["ออกกำลังกาย 2–3 วันต่อสัปดาห์ ครั้งละ 30 นาทีก่อน","เรียนท่าพื้นฐานให้ถูกตั้งแต่แรก","เน้นทำได้ต่อเนื่อง มากกว่าทำหนัก"]}
 };
-function archetype(r){
+function baseArch(r){
   const known = r.dom.filter(d => d.s != null), sc = {}; r.dom.forEach(d => sc[d.k] = d.s);
   if(!known.length) return ARCH.zero;
   if(known.length === 5 && known.every(d => d.s >= 85)) return ARCH.legend;
@@ -962,6 +962,73 @@ const CARD = {
   zero:{no:7, bg:"#06161c", acc:"#3fc6d1", soft:"#0d2830", ink:"#e6fbff", mute:"#86b6bf", d:"ทุกด้านยังมีที่ให้โต", sk:"ไปได้ไกลที่สุด",
     m:'<circle class="m-tw" cx="36" cy="58" r="1.8" fill="#e6fbff"/><circle cx="132" cy="50" r="1.8" fill="#e6fbff"/><circle class="m-tw" style="animation-delay:.7s" cx="138" cy="100" r="1.6" fill="#e6fbff"/><g class="m-bob"><g class="m-flapL"><ellipse cx="62" cy="96" rx="9" ry="6" fill="#ffd54f"/></g><g class="m-flapR"><ellipse cx="108" cy="96" rx="9" ry="6" fill="#ffd54f"/></g><circle cx="85" cy="90" r="24" fill="#ffe066"/><circle cx="77" cy="86" r="3" fill="#06161c"/><circle cx="93" cy="86" r="3" fill="#06161c"/><path d="M80 93 l5 5 l5 -5 z" fill="#ff9f43"/><circle cx="71" cy="94" r="3" fill="#ffb3a0" opacity=".8"/><circle cx="99" cy="94" r="3" fill="#ffb3a0" opacity=".8"/><path d="M68 66 l5 -10 l7 8 l5 -9 l5 9 l7 -8 l5 10 Z" fill="#f2f0e6"/></g><path d="M56 104 l7 8 l7 -8 l7 8 l8 -8 l8 8 l7 -8 l7 8 l7 -8 v14 C114 142 56 142 56 118 Z" fill="#f2f0e6"/><path d="M58 128 q27 12 54 0" fill="none" stroke="#c9c6b8" stroke-width="1.5"/>'}
 };
+
+/* ---------- วิวัฒนาการ: แต่ละสัตว์มีร่างถัดไปของตัวเอง ---------- */
+const BBOX = {"strength":[40,49,91,95],"cardio":[42,37,94,109],"flex":[36,31,108,120],"body":[30,59,117,83],"life":[22,43,128,97],"top":[23,40,126,108],"tank":[26,46,122,101],"rabbit":[24,21,98,125],"noodle":[56,45,87,99],"safe":[26,38,118,110],"kangaroo":[26,32,89,116],"turtle":[24,50,124,80],"owl":[36,36,100,100],"volcano":[35,30,106,104],"core":[20,52,134,81],"cheetah":[30,53,105,93],"legend":[18,40,131,106],"zero":[34,48,105,88]};
+const ADD = {
+  crown(b){ const cx = b[0] + b[2]/2, y = b[1] + 2; return `<g class="m-float"><path d="M${cx-15} ${y} L${cx-15} ${y-13} L${cx-7.5} ${y-6} L${cx} ${y-17} L${cx+7.5} ${y-6} L${cx+15} ${y-13} L${cx+15} ${y} Z" fill="#f5c84b" stroke="#b9861f" stroke-width="1.2"/><circle cx="${cx}" cy="${y-5}" r="2.2" fill="#ff5d73"/><circle cx="${cx-9}" cy="${y-3}" r="1.6" fill="#5ad1ff"/><circle cx="${cx+9}" cy="${y-3}" r="1.6" fill="#5ad1ff"/></g>`; },
+  halo(b){ const cx = b[0] + b[2]/2; return `<ellipse class="m-float" cx="${cx}" cy="${b[1]-5}" rx="17" ry="4.5" fill="none" stroke="#f5c84b" stroke-width="2.6"/>`; },
+  cap(b){ const cx = b[0] + b[2]/2, y = b[1] + 1; return `<path d="M${cx-19} ${y-4} L${cx} ${y-12} L${cx+19} ${y-4} L${cx} ${y+4} Z" fill="#2b2f45"/><rect x="${cx-9}" y="${y-3}" width="18" height="7" fill="#2b2f45"/><path class="m-bob" d="M${cx} ${y-4} L${cx+15} ${y-2} L${cx+15} ${y+10}" fill="none" stroke="#f5c84b" stroke-width="1.6"/><circle cx="${cx+15}" cy="${y+11}" r="2" fill="#f5c84b"/>`; },
+  bolts(b){ const L = b[0] - 4, R = b[0] + b[2] + 4, y = b[1] + b[3]*0.3, bolt = x => `<path class="m-pulse" d="M${x} ${y} l-7 13 h6 l-4 12 l11 -16 h-6 l5 -9 z" fill="#ffe14d" stroke="#d9a400" stroke-width=".8"/>`; return bolt(L) + bolt(R - 4); },
+  stars(b){ const st = (x, y, r) => `<path class="m-pulse" d="M${x} ${y-r} Q${x} ${y} ${x+r} ${y} Q${x} ${y} ${x} ${y+r} Q${x} ${y} ${x-r} ${y} Q${x} ${y} ${x} ${y-r} Z" fill="#fff6c2"/>`;
+    return st(b[0] - 2, b[1] + 10, 6) + st(b[0] + b[2] + 2, b[1] + b[3]*0.35, 5) + st(b[0] + b[2]*0.82, b[1] - 6, 4); },
+  gloves(b){ const y = b[1] + b[3]*0.48, g = x => `<g class="m-bob"><circle cx="${x}" cy="${y}" r="10" fill="#e8394d"/><rect x="${x-7}" y="${y+7}" width="14" height="6" rx="2" fill="#fff"/><path d="M${x-4} ${y-5} q4 -3 8 0" fill="none" stroke="#ff8a98" stroke-width="2"/></g>`; return g(b[0] + 2) + g(b[0] + b[2] - 2); },
+  // วาดไว้หลังตัว
+  wings(b){ const cx = b[0] + b[2]/2, cy = b[1] + b[3]*0.45, w = (sx) => `<g transform="translate(${cx} ${cy}) scale(${sx} 1)"><path d="M0 0 C 20 -48 70 -52 66 -14 C 62 6 30 6 0 0 Z" fill="#ff9be0" stroke="#d457b0" stroke-width="1.5"/><path d="M0 4 C 18 10 52 18 46 42 C 38 58 10 40 0 4 Z" fill="#ffc96b" stroke="#d99a2b" stroke-width="1.5"/><circle cx="44" cy="-22" r="6" fill="#fff" opacity=".7"/></g>`; return `<g class="m-flapL">${w(-1)}</g><g class="m-flapR">${w(1)}</g>`; },
+  flames(b){ const cx = b[0] + b[2]/2, y = b[1] + b[3]*0.35, f = (dx, h) => `<path d="M${cx+dx-9} ${y+10} Q${cx+dx-10} ${y-h*0.5} ${cx+dx} ${y-h} Q${cx+dx+10} ${y-h*0.5} ${cx+dx+9} ${y+10} Z" fill="#ff8a2b" opacity=".9"/><path d="M${cx+dx-5} ${y+10} Q${cx+dx-5} ${y-h*0.3} ${cx+dx} ${y-h*0.65} Q${cx+dx+5} ${y-h*0.3} ${cx+dx+5} ${y+10} Z" fill="#ffd24d"/>`;
+    return `<g class="m-pulse">${f(-b[2]*0.38, 30)}${f(-b[2]*0.18, 42)}${f(0, 50)}${f(b[2]*0.18, 42)}${f(b[2]*0.38, 30)}</g>`; },
+  cape(b){ const cx = b[0] + b[2]/2, t = b[1] + b[3]*0.32, bt = b[1] + b[3] + 2; return `<path class="m-bob" d="M${cx-b[2]*0.22} ${t} L${cx+b[2]*0.22} ${t} L${cx+b[2]*0.52} ${bt} Q${cx} ${bt-10} ${cx-b[2]*0.52} ${bt} Z" fill="#e8394d" stroke="#a81f31" stroke-width="1.2"/>`; },
+  aura(b){ const cx = b[0] + b[2]/2, cy = b[1] + b[3]/2; return `<ellipse class="m-pulse" cx="${cx}" cy="${cy}" rx="${b[2]*0.62}" ry="${b[3]*0.6}" fill="#fff6c2" opacity=".14"/>`; }
+};
+const BACK = {wings:1, flames:1, cape:1, aura:1};
+const EVO = {
+  strength:{t:"ช้างพลายพลังสาร", d:"แรงเต็มตัวแล้ว ยกอะไรก็ไหว", sk:"แบกได้ทั้งบ้าน", add:["aura","flames","crown"], req:r => [qd(r,"strength",65)]},
+  cardio:{t:"ปั๊กนักวิ่งมาราธอน", d:"จากหอบแฮ่ก สู่วิ่งไม่พัก", sk:"วิ่งยาวไม่หอบ", add:["cape","bolts","stars"], req:r => [qd(r,"cardio",65)]},
+  flex:{t:"ยีราฟโยคีคอยาว", d:"ก้มถึงพื้นสบายๆ", sk:"เหยียดสุดไม่ตึง", add:["aura","halo","stars"], req:r => [qd(r,"flex",65)]},
+  body:{t:"ผีเสื้อเจ้าเวหา", d:"ลอกคราบสู่ร่างใหม่", sk:"ตัวเบา บินได้ไกล", add:["wings","stars"], req:r => [qd(r,"body",70)]},
+  life:{t:"สลอธสายแอคทีฟ", d:"ลุกขึ้นมาขยับทุกวัน", sk:"ขยับทั้งวันไม่เหนื่อย", add:["aura","bolts","stars"], req:r => [qd(r,"life",70)]},
+  top:{t:"ราชสีห์ทองคำ", d:"เจ้าป่าทุกด้าน 80 ขึ้นไป", sk:"คำรามทีป่าสะเทือน", add:["aura","flames","crown"], req:r => r.dom.map(d => qd(r,d.k,80))},
+  zero:{t:"ไก่ชนเจ้าสังเวียน", d:"จากลูกเจี๊ยบ สู่ไก่ชนตัวจริง", sk:"ฟิตขึ้นทุกด้าน", add:["aura","flames","crown"], req:r => r.dom.map(d => qd(r,d.k,50))},
+  tank:{t:"กอริลลาพลังไม่สิ้นสุด", d:"แรงเยอะ แถมอึดแล้ว", sk:"สู้ได้ทั้งวัน", add:["aura","flames","bolts"], req:r => [qd(r,"strength",65), qd(r,"cardio",65)]},
+  rabbit:{t:"กระต่ายกล้ามเหล็ก", d:"อึดเหมือนเดิม แต่แรงมาแล้ว", sk:"วิ่งได้ ยกได้", add:["aura","gloves","stars"], req:r => [qd(r,"cardio",65), qd(r,"strength",65)]},
+  noodle:{t:"คราเคนเจ้าสมุทร", d:"ยืดหยุ่นแถมคุมแรงได้", sk:"รัดแน่นไม่ปล่อย", add:["aura","crown","stars"], req:r => [qd(r,"flex",65), qd(r,"strength",65)]},
+  safe:{t:"ด้วงกว่างนินจา", d:"เกราะแข็ง แต่ขยับพลิ้ว", sk:"แรงแถมคล่อง", add:["cape","bolts","stars"], req:r => [qd(r,"strength",65), qd(r,"flex",65)]},
+  kangaroo:{t:"จิงโจ้แชมป์มวย", d:"ช่วงบนตามทันช่วงล่างแล้ว", sk:"หมัดหนักขาแน่น", add:["aura","gloves","crown"], req:r => [qPush(r), qd(r,"strength",65)]},
+  turtle:{t:"เต่ามังกรหลังตรง", d:"ไหล่เปิด หลังตรง คอไม่ยื่น", sk:"ยืนตรงสง่า", add:["aura","halo","stars"], req:r => [qReach(), qd(r,"flex",70)]},
+  owl:{t:"นกฮูกจอมปราชญ์", d:"นอนพอ สมองไบรท์", sk:"ฟื้นตัวไว คิดไว", add:["aura","cap","stars"], req:r => [qSleep(), qd(r,"life",70)]},
+  volcano:{t:"ปักเป้าจิตนิ่ง", d:"เครียดน้อยลง ร่างกายฟื้นไว", sk:"ใจนิ่งตัวเบา", add:["aura","halo","stars"], req:r => [qStress(), qd(r,"life",70)]},
+  core:{t:"จระเข้ไททัน", d:"แกนเหล็กขั้นสุด", sk:"แพลงก์ 3 นาทีชิลๆ", add:["aura","flames","crown"], req:r => [qPlank(180), qd(r,"strength",80)]},
+  cheetah:{t:"ชีตาห์สายฟ้า", d:"หัวใจระดับนักกีฬา", sk:"เร็วเหมือนสายฟ้า", add:["aura","bolts","flames"], req:r => [qRhr(55), qd(r,"cardio",85)]},
+  legend:{t:"มังกรเทพจักรวาล", d:"ทุกด้าน 95 ขึ้นไป", sk:"ไร้ขีดจำกัด", add:["aura","flames","halo","stars"], req:r => r.dom.map(d => qd(r,d.k,95))}
+};
+function qd(r, k, min){ const d = r.dom.find(x => x.k === k), v = nn(d && d.s, 0); return [v >= min, `${d ? d.name : k} ${min} ขึ้นไป`, `ตอนนี้: ${v}`]; }
+function qPlank(sec){ const v = n("plank"); return [v != null && v >= sec, `แพลงก์ค้างได้ ${sec/60} นาที`, v == null ? "ตอนนี้: ยังไม่ได้ทดสอบ" : `ตอนนี้: ${v} วินาที`]; }
+function qRhr(max){ const v = n("rhr"); return [v != null && v >= 35 && v < max, `ชีพจรขณะพักต่ำกว่า ${max}`, v == null ? "ตอนนี้: ยังไม่ได้ทดสอบ" : `ตอนนี้: ${v} ครั้ง/นาที`]; }
+function qPush(r){ const p = r.pushN; return [!!p && p.i >= 2, "วิดพื้นได้ระดับ “ดี” ขึ้นไป", p ? `ตอนนี้: ${n("push")} ครั้ง (${p.lv})` : n("push") != null ? "ตอนนี้: ยังไม่ได้วัดแบบที่มีเกณฑ์ (ชายวิดเต็มตัว)" : "ตอนนี้: ยังไม่ได้ทดสอบ"]; }
+function qReach(){ const v = numC("reach"); return [v != null && v >= 3, "เอื้อมมือไขว้หลังแตะกันได้", v == null ? "ตอนนี้: ยังไม่ได้ทดสอบ" : `ตอนนี้: ${["", "ห่างมากกว่า 10 ซม.", "ห่างเล็กน้อย", "แตะกันพอดี", "ซ้อนกันได้"][v]}`]; }
+function qSleep(){ const v = S.a.sleep; return [v === "c" || v === "d", "นอน 7 ชั่วโมงขึ้นไป", `ตอนนี้: ${{a:"น้อยกว่า 6 ชม.", b:"6–7 ชม.", c:"7–9 ชม.", d:"มากกว่า 9 ชม."}[v] || "-"}`]; }
+function qStress(){ const v = Number(S.a.stress); return [v > 0 && v <= 2, "ความเครียดลดลงเหลือระดับน้อย", `ตอนนี้: ${["", "ชิลมาก", "น้อย", "ปานกลาง", "ค่อนข้างมาก", "เครียดมาก"][v] || "-"}`]; }
+function evoOk(sp, r){ return !!EVO[sp] && EVO[sp].req(r).every(x => x[0]); }
+function evoArt(sp){
+  const b = BBOX[sp] || [30, 40, 110, 100], E = EVO[sp];
+  const back = E.add.filter(a => BACK[a]).map(a => ADD[a](b)).join(""), front = E.add.filter(a => !BACK[a]).map(a => ADD[a](b)).join("");
+  return `<g transform="translate(85 96) scale(.9) translate(-85 -92)">${back}${CARD[sp].m}${front}</g>`;
+}
+Object.keys(EVO).forEach(sp => {
+  const B = CARD[sp], E = EVO[sp];
+  CARD["evo_" + sp] = {no:B.no, bg:B.bg, acc:B.acc, soft:B.soft, ink:B.ink, mute:B.mute, d:E.d, sk:E.sk, tier:"EVOLVED", m:evoArt(sp)};
+  ARCH["evo_" + sp] = {t:E.t, d:`${ARCH[sp].t} วิวัฒนาการแล้ว! ${E.d} จุดที่เคยเป็นจุดอ่อนของสายนี้ขึ้นมาอยู่ในเกณฑ์ดี รักษาโปรแกรมต่อ แล้วไล่ล่าร่างถัดไป`, p:ARCH[sp].p};
+});
+function speciesOf(k){ return String(k || "").replace(/^evo_/, ""); }
+// การ์ดที่ได้: ถ้าผ่านเงื่อนไขวิวัฒนาการของสัตว์ตัวเดิม (หรือของตัวที่ได้ตอนนี้) จะได้ร่างวิวัฒนาการ
+function archetype(r){
+  const b = baseArch(r), bk = archKey(b);
+  if(bk === "legend") return evoOk("legend", r) ? ARCH.evo_legend : b;
+  const prev = S.species;
+  if(prev && prev !== "legend" && EVO[prev] && evoOk(prev, r)) return ARCH["evo_" + prev];
+  if(EVO[bk] && evoOk(bk, r)) return ARCH["evo_" + bk];
+  return b;
+}
 function archKey(ar){ return Object.keys(ARCH).find(k => ARCH[k] === ar) || "zero"; }
 function cardSVG(k, r, ar, nm){
   const C = CARD[k] || CARD.zero, F = "'IBM Plex Sans Thai','Thonburi','Leelawadee UI',sans-serif";
@@ -1083,49 +1150,44 @@ function skippedTests(){
 }
 
 /* ---------- ร่างต่อไป (เงาการ์ด) ---------- */
-const NEXT = {strength:"core", rabbit:"core", noodle:"core", kangaroo:"core",
-  cardio:"cheetah", tank:"cheetah",
-  flex:"top", safe:"top", turtle:"top", life:"top", owl:"top", volcano:"top", body:"top", zero:"top",
-  top:"legend", core:"legend", cheetah:"legend", legend:"legend"};
-function nextReq(nk, r){
-  const sc = {}; r.dom.forEach(d => sc[d.k] = d.s);
-  const row = (ok, t, now) => `<li class="${ok ? "ok" : ""}"><span>${ok ? "✓" : "○"}</span><span>${t}<small>${now}</small></span></li>`;
-  if(nk === "core"){ const pl = n("plank"); return row(pl != null && pl >= 120, "แพลงก์ค้างได้ 2 นาที", pl == null ? "ตอนนี้: ยังไม่ได้ทดสอบ" : `ตอนนี้: ${pl} วินาที`); }
-  if(nk === "cheetah"){ const h = n("rhr");
-    return row(h != null && h >= 40 && h < 60, "ชีพจรขณะพักต่ำกว่า 60", h == null ? "ตอนนี้: ยังไม่ได้ทดสอบ" : `ตอนนี้: ${h} ครั้ง/นาที`) +
-           row(sc.cardio >= 70, "หัวใจและปอด 70 ขึ้นไป", `ตอนนี้: ${nn(sc.cardio, 0)}`); }
-  const need = nk === "legend" ? 85 : 75;
-  return r.dom.map(d => row(d.s >= need, `${d.name} ${need} ขึ้นไป`, `ตอนนี้: ${nn(d.s, 0)}`)).join("");
+function silSVG(art, acc){
+  return `<svg viewBox="0 0 170 165" width="100%"><defs><filter id="sil" x="-20%" y="-20%" width="140%" height="140%"><feFlood flood-color="#020403"/><feComposite in2="SourceAlpha" operator="in" result="s"/><feMorphology in="SourceAlpha" operator="dilate" radius="1.6" result="d"/><feFlood flood-color="${acc}"/><feComposite in2="d" operator="in" result="e"/><feGaussianBlur in="e" stdDeviation="2.5" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="e"/><feMergeNode in="s"/></feMerge></filter></defs><g filter="url(#sil)">${art}</g></svg>`;
 }
 function nextSection(r, ar){
-  const k = archKey(ar), nk = NEXT[k] || "top", C = CARD[nk], A = ARCH[nk];
-  if(k === "legend") return `<section class="card nextsec"><div class="nx-k">ร่างสูงสุดแล้ว</div><h2>คุณคือ${A.t}</h2>
-    <p class="sub">ทุกด้าน 85 ขึ้นไป รักษาร่างนี้ไว้ด้วยโปรแกรมด้านล่าง แล้วกลับมาทดสอบทุก 8 สัปดาห์</p>
+  const k = archKey(ar), sp = speciesOf(k), evolved = k !== sp;
+  const row = x => `<li class="${x[0] ? "ok" : ""}"><span>${x[0] ? "✓" : "○"}</span><span>${x[1]}<small>${x[2]}</small></span></li>`;
+  if(k === "evo_legend") return `<section class="card nextsec"><div class="nx-k">ร่างสูงสุดของทั้งเกม</div><h2>คุณคือ${ar.t}</h2>
+    <p class="sub">ไม่มีร่างไหนเหนือกว่านี้แล้ว รักษาร่างนี้ไว้ด้วยโปรแกรมด้านล่าง แล้วกลับมาทดสอบทุก 8 สัปดาห์</p>
     <a class="btn btn-primary" href="#plan" style="width:100%;margin-top:12px;text-decoration:none">ดูโปรแกรมรักษาร่าง ↓</a></section>`;
-  const label = C.tier ? C.tier : C.rare ? "RARE" : "";
-  return `<section class="card nextsec">
-    <div class="nx-k">ร่างต่อไปของคุณ</div>
-    <h2>ออกกำลังกายตามโปรแกรมด้านล่าง<br>เพื่อพัฒนาไปร่างต่อไป</h2>
+  // ยังไม่วิวัฒนาการ: เงาร่างวิวัฒนาการของตัวเอง / วิวัฒนาการแล้ว: เป้าหมายต่อไปคือมังกรตำนาน
+  const tk = evolved ? "legend" : sp, C = CARD[tk], art = evolved ? CARD.legend.m : CARD["evo_" + sp].m;
+  const rows = evolved ? r.dom.map(d => qd(r, d.k, 85)) : EVO[sp].req(r);
+  const head = evolved ? `<div class="nx-k">วิวัฒนาการแล้ว · เป้าหมายต่อไป</div><h2>ออกกำลังกายตามโปรแกรมด้านล่าง<br>เพื่อไปสู่ร่างตำนาน</h2>`
+    : `<div class="nx-k">ร่างวิวัฒนาการของ${ARCH[sp].t}</div><h2>ออกกำลังกายตามโปรแกรมด้านล่าง<br>เพื่อพัฒนาไปร่างต่อไป</h2>`;
+  return `<section class="card nextsec">${head}
     <div class="nx-row">
-      <div class="nx-from">${`<svg viewBox="0 0 170 165" width="100%"><g>${CARD[k].m}</g></svg>`}<small>${ar.t}</small></div>
+      <div class="nx-from"><svg viewBox="0 0 170 165" width="100%">${CARD[k].m}</svg><small>${ar.t}</small></div>
       <div class="nx-arrow">➜</div>
-      <div class="nx-to" style="--glow:${C.acc}"><svg viewBox="0 0 170 165" width="100%"><defs><filter id="sil" x="-20%" y="-20%" width="140%" height="140%"><feFlood flood-color="#020403"/><feComposite in2="SourceAlpha" operator="in" result="s"/><feMorphology in="SourceAlpha" operator="dilate" radius="1.6" result="d"/><feFlood flood-color="${C.acc}"/><feComposite in2="d" operator="in" result="e"/><feGaussianBlur in="e" stdDeviation="2.5" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="e"/><feMergeNode in="s"/></feMerge></filter></defs><g filter="url(#sil)">${C.m}</g></svg><small>??? ${label ? `<b>${label}</b>` : ""}</small></div>
+      <div class="nx-to" style="--glow:${C.acc}">${silSVG(art, C.acc)}<small>??? <b>${evolved ? "LEGENDARY" : "EVOLVED"}</b></small></div>
     </div>
-    <div class="nx-need"><b>ปลดล็อกเมื่อ</b><ul>${nextReq(nk, r)}</ul></div>
+    <div class="nx-need"><b>${evolved ? "ปลดล็อกเมื่อ" : "วิวัฒนาการเมื่อ"}</b><ul>${rows.map(row).join("")}</ul></div>
+    <p class="meta" style="margin-top:8px">ทำตามโปรแกรม 6–8 สัปดาห์ แล้วกลับมาทดสอบใหม่ในเครื่องเดิม กด “แก้คำตอบ” ใส่ผลใหม่ ถ้าผ่านครบ การ์ดจะ${evolved ? "กลายเป็นร่างตำนาน" : "วิวัฒนาการ"}</p>
     <a class="btn btn-primary" href="#plan" style="width:100%;margin-top:12px;text-decoration:none">ไปที่โปรแกรมของคุณ ↓</a>
   </section>`;
 }
 
 /* ---------- เปิดการ์ดแบบลุ้น ---------- */
 function revealCard(){
-  const r = compute(), ar = archetype(r), k = archKey(ar), C = CARD[k] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ";
+  const prev = S.species, r = compute(), ar = archetype(r), k = archKey(ar), C = CARD[k] || CARD.zero, nm = S.a.name ? esc(S.a.name) : "คุณ";
+  S.species = speciesOf(k); save();
+  const evoNow = k !== speciesOf(k), fromName = evoNow ? ARCH[speciesOf(k)].t : "";
   const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const label = C.tier ? C.tier : C.rare ? "RARE" : "";
   const ov = document.createElement("div");
   ov.className = "reveal" + (label ? " rare" : "");
   ov.style.setProperty("--acc", C.acc); ov.style.setProperty("--bgc", C.bg);
   ov.innerHTML = `<div class="rv-rays"></div>
-    <div class="rv-msg">กำลังเปิดการ์ดร่างกายของ${nm}…</div>
+    <div class="rv-msg">${evoNow ? `${fromName} กำลังวิวัฒนาการ…` : `กำลังเปิดการ์ดร่างกายของ${nm}…`}</div>
     <div class="rv-card"><div class="rv-in">
       <div class="rv-back"><svg viewBox="0 0 340 560"><rect x="4" y="4" width="332" height="552" rx="20" fill="#0d1a14" stroke="#3fd18f" stroke-width="4"/>
         <rect x="18" y="18" width="304" height="524" rx="12" fill="none" stroke="#3fd18f" stroke-opacity=".35" stroke-dasharray="6 8"/>
@@ -1133,7 +1195,7 @@ function revealCard(){
         <text x="170" y="470" font-size="18" letter-spacing="4" text-anchor="middle" fill="#8fb0a0" font-family="Chakra Petch,sans-serif">FUJI BODY CARD</text></svg></div>
       <div class="rv-front pcard">${cardSVG(k, r, ar, nm)}</div>
     </div></div>
-    <div class="rv-name">${label ? `<span class="rv-tag">${label}!</span>` : ""}คุณคือ <b>${ar.t}</b></div>
+    <div class="rv-name">${label ? `<span class="rv-tag">${label}!</span>` : ""}${evoNow ? `${fromName} วิวัฒนาการเป็น` : "คุณคือ"} <b>${ar.t}</b></div>
     <button class="btn btn-primary rv-go" type="button">ดูผลและโปรแกรมของฉัน</button>
     <div class="rv-skip">แตะเพื่อข้าม</div>`;
   document.body.appendChild(ov);
@@ -1773,6 +1835,7 @@ function fixState(){
   const p = S.a.pain; if(p != null && !Array.isArray(p)) S.a.pain = [String(p)];
   if(S.a.goal && !["fat","muscle","health","pain","sport"].includes(S.a.goal)) delete S.a.goal;
   if(!(S.step >= 0 && S.step < STEPS.length)) S.step = 0;
+  if(S.species && !EVO[S.species]) delete S.species;
   const sk = S.skipped, emp = k => S.a[k] === undefined || S.a[k] === "";
   if(sk.push && !sk.pushStyle && emp("push")) sk.pushStyle = true;
   if(sk.pushStyle && !sk.push && emp("pushStyle")) sk.push = true;
