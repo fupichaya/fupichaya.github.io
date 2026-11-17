@@ -1275,7 +1275,7 @@ async function makeStoryVideo(mime, ac){
   const front = await svgImg(cardSVG(fk, r, ar, nm));
   const F = "'IBM Plex Sans Thai','Chakra Petch','Thonburi',sans-serif";
   const host = SHARE_URL.replace(/^https:\/\//, "").replace(/\/$/, "");
-  const SPIN = 3300, SHAKE = 3300, REV = 4300, TOTAL = REV + 3300;
+  const SPIN = 3300, SHAKE = 3300, REV = 4300, TOTAL = REV + 6500; // หลังเปิดค้างไว้ 6.5 วิ ให้ดูการ์ดทัน
   // มุมหมุน: เร่งแล้วผ่อน หมุน 7 รอบ
   const TURN = 7 * Math.PI * 2;
   // ความเร็วเพิ่มจนถึง 35% ของเวลา แล้วค่อยๆ ลดจนหยุด หน้าการ์ดจบที่ด้านหลังตรงพอดี
@@ -1340,9 +1340,9 @@ async function makeStoryVideo(mime, ac){
       back(20 + k * 60);
     } else {
       // พลิกเปิด: ครึ่งแรกหลังการ์ดหดเข้า ครึ่งหลังหน้าการ์ดกางออก
-      const f = Math.min(1, rt / 260);
+      const f = Math.min(1, rt / 520);
       if(f < 0.5){ x.scale(Math.max(0.03, 1.08 * (1 - f * 2)), 1.08); back(80); }
-      else { const sc = 1 + Math.max(0, 0.1 - rt / 3000); x.scale(Math.max(0.03, (f - 0.5) * 2) * sc, sc); x.shadowColor = FC.acc; x.shadowBlur = 60; x.drawImage(front, -cw / 2, -ch / 2, cw, ch); }
+      else { const sc = (1 + Math.max(0, 0.1 - rt / 3000)) * (1 + 0.015 * Math.sin(rt / 380)); x.scale(Math.max(0.03, (f - 0.5) * 2) * sc, sc); x.shadowColor = FC.acc; x.shadowBlur = 60; x.drawImage(front, -cw / 2, -ch / 2, cw, ch); }
     }
     x.restore();
     if(rev && rt < 2400){
