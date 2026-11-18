@@ -412,6 +412,9 @@ const RHRN = {
 const RHR_LV = ["ระดับนักกีฬา","ดีเยี่ยม","ดี","ดีกว่าค่าเฉลี่ย","ค่าเฉลี่ย","ต่ำกว่าค่าเฉลี่ย","ควรปรับปรุง"];
 const sexTh = () => S.a.sex === "f" ? "ผู้หญิง" : "ผู้ชาย";
 function pickRow(rows, age){ let r = rows[0]; rows.forEach(x => { if(age >= x[0]) r = x; }); return r; }
+// ปรับให้ทุกด้านใช้มาตรฐานเดียวกัน: คนระดับค่ากลางของวัย ≈ 70 คะแนน (เดิมความแข็งแรงค่ากลางได้แค่ 55 เลยต่ำกว่าด้านอื่นเสมอ)
+function pctScore(p){ const P = [[0,15],[2.5,20],[25,50],[50,70],[75,85],[97.5,100],[100,100]]; for(let i = 1; i < P.length; i++){ if(p <= P[i][0]){ const a = P[i-1], b = P[i]; return Math.round(a[1] + (b[1]-a[1]) * (p-a[0]) / (b[0]-a[0])); } } return 100; }
+function plankScore(s){ return s < 15 ? 25 : s < 30 ? 45 : s < 60 ? 60 : s < 90 ? 75 : s < 120 ? 88 : 100; }
 function stsNorm(v, age, sex){
   const row = pickRow(STS[sex], age), pts = row.slice(1), pc = [2.5,25,50,75,97.5];
   let pct;
@@ -421,7 +424,7 @@ function stsNorm(v, age, sex){
   const lv = pct >= 75 ? "กลุ่มท็อป 25%" : pct >= 50 ? "สูงกว่าค่ากลาง" : pct >= 25 ? "ต่ำกว่าค่ากลาง" : "ต่ำกว่าเกณฑ์";
   const next = v < pts[1] ? {t:"ให้พ้นกลุ่ม 25% ล่างสุด", n:pts[1]} : v < pts[2] ? {t:"ถึงค่ากลาง", n:pts[2]} : v < pts[3] ? {t:"เข้ากลุ่มท็อป 25%", n:pts[3]} : null;
   const edge = age < 20 ? " (ใช้เกณฑ์ 20–24 ปี)" : age > 79 ? " (ใช้เกณฑ์ 75–79 ปี)" : "";
-  return {pct, lv, med:pts[2], next, group:`${sexTh()} ${row[0]}–${row[0]+4} ปี${edge}`, score:Math.round(10 + pct*0.9)};
+  return {pct, lv, med:pts[2], next, group:`${sexTh()} ${row[0]}–${row[0]+4} ปี${edge}`, score:pctScore(pct)};
 }
 function pushNorm(v, style, age, sex){
   // เกณฑ์ CSEP: ชายใช้วิดพื้นเต็มตัว หญิงใช้แบบวางเข่า
@@ -431,14 +434,14 @@ function pushNorm(v, style, age, sex){
   const next = i < 4 ? {t:`ถึงระดับ “${PUSH_LV[i+1]}”`, n:th[i]} : null;
   const edge = age < 15 ? " (ใช้เกณฑ์ 15–19 ปี)" : age > 69 ? " (ใช้เกณฑ์ 60–69 ปี)" : "";
   const note = sex === "f" && style === "full" ? "เทียบกับเกณฑ์วางเข่า แต่คุณทำแบบเต็มตัวซึ่งยากกว่า ระดับจริงน่าจะสูงกว่านี้" : "";
-  return {i, lv:PUSH_LV[i], next, note, group:`${sexTh()} ${row[0]}–${PUSH_HI[row[0]]} ปี${edge}`, score:[20,40,60,80,100][i]};
+  return {i, lv:PUSH_LV[i], next, note, group:`${sexTh()} ${row[0]}–${PUSH_HI[row[0]]} ปี${edge}`, score:[30,55,70,85,100][i]};
 }
 function rhrNorm(v, age, sex){
   const row = pickRow(RHRN[sex], age), ub = row.slice(2);
   let i = 0; while(i < ub.length && v > ub[i]) i++;
   const next = i >= 3 ? {t:`ถึงระดับ “${RHR_LV[i-1]}”`, n:ub[i-1], le:true} : null;
   const edge = age < 18 ? " (ใช้เกณฑ์ 18–25 ปี)" : "";
-  return {i, lv:RHR_LV[i], next, group:`${sexTh()} ${row[1] ? `${row[0]}–${row[1]}` : `${row[0]} ปีขึ้นไป`}${row[1] ? " ปี" : ""}${edge}`, score:[100,90,80,70,55,40,25][i]};
+  return {i, lv:RHR_LV[i], next, group:`${sexTh()} ${row[1] ? `${row[0]}–${row[1]}` : `${row[0]} ปีขึ้นไป`}${row[1] ? " ปี" : ""}${edge}`, score:[100,92,84,76,66,50,32][i]};
 }
 
 function compute(measured){
@@ -457,7 +460,7 @@ function compute(measured){
     else { const mult = {full:1, knee:0.5, wall:0.25}[c("pushStyle")]; push = bandUp(n("push") * mult, female ? [2,6,12,20] : [5,12,20,30]); }
   }
   const pl = n("plank");
-  const strength = avg([Z(sqN ? sqN.score : null), Z(push), Z(pl!=null?bandUp(pl,[20,45,75,120]):null)]);
+  const strength = avg([Z(sqN ? sqN.score : null), Z(push), Z(pl!=null?plankScore(pl):null)]);
   // cardio
   const st = c("march"), rhr = n("rhr"), rhrN = rhr != null ? rhrNorm(rhr, age, sx) : null;
   const cardio = avg([Z(st ? {1:20,2:45,3:70,4:95}[st] : null), Z(rhrN ? rhrN.score : null),
@@ -554,7 +557,9 @@ function baseArch(r){
   if(r.sqN && r.pushN){ const g = r.sqN.score - r.pushN.score; if(r.sqN.score >= 65 && g >= 35 && (!best || g > best.g)) best = {k:"kangaroo", g:g}; }
   if(best) return ARCH[best.k];
   // จุดอ่อนที่สุด แล้วดูพฤติกรรมเฉพาะ
-  const weakest = known.slice().sort((x,y) => x.s - y.s)[0], reach = numC("reach");
+  // จุดอ่อนที่สุด: ถ้าหลายด้านต่ำพอๆ กัน (ห่างไม่เกิน 3 คะแนน) ให้ความแข็งแรงเป็นตัวเลือกสุดท้าย
+  const lo = Math.min.apply(null, known.map(d => d.s)), PRI = ["cardio", "flex", "life", "body", "strength"];
+  const weakest = known.filter(d => d.s <= lo + 3).sort((x,y) => PRI.indexOf(x.k) - PRI.indexOf(y.k))[0], reach = numC("reach");
   if((weakest.k === "flex" || weakest.k === "life") && S.a.sit === "c" && reach != null && reach <= 2) return ARCH.turtle;
   if(weakest.k === "life"){ if(S.a.sleep === "a") return ARCH.owl; if(Number(S.a.stress) >= 4) return ARCH.volcano; }
   return ARCH[weakest.k];
