@@ -902,7 +902,7 @@ function powerDay(r){
 }
 function exLi(e){
   const an = e.a || EX_ANIM[e.n];
-  return `<li class="${an ? "has-anim" : ""}">${an ? `<canvas data-anim="${an}" width="400" height="280" aria-label="ภาพเคลื่อนไหวท่า ${e.n}"></canvas>` : ""}<div><span>${e.n}</span><b>${e.rx}</b>${e.why ? `<small class="exwhy">ทำไมท่านี้: ${e.why}</small>` : ""}${e.up || e.down ? `<small class="exlad">${e.up ? `<i>สบายแล้ว →</i> ${e.up}` : ""}${e.up && e.down ? "<br>" : ""}${e.down ? `<i>ยากไป →</i> ${e.down}` : ""}</small>` : ""}</div></li>`;
+  return `<li class="${an ? "has-anim" : ""}">${an ? `<canvas data-anim="${an}" width="400" height="280" aria-label="ภาพเคลื่อนไหวท่า ${e.n}"></canvas>` : ""}<div><span>${e.n}</span><b>${e.rx}</b></div></li>`;
 }
 function exercises(k, r){
   if(k === "z2" || k === "hiit") return cardioDay(k, r);
