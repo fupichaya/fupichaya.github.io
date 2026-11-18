@@ -1039,14 +1039,8 @@ Object.keys(EVO).forEach(sp => {
 });
 function speciesOf(k){ return String(k || "").replace(/^evo_/, ""); }
 // การ์ดที่ได้: ถ้าผ่านเงื่อนไขวิวัฒนาการของสัตว์ตัวเดิม (หรือของตัวที่ได้ตอนนี้) จะได้ร่างวิวัฒนาการ
-function archetype(r){
-  const b = baseArch(r), bk = archKey(b);
-  if(bk === "legend") return evoOk("legend", r) ? ARCH.evo_legend : b;
-  const prev = S.species;
-  if(prev && prev !== "legend" && EVO[prev] && evoOk(prev, r)) return ARCH["evo_" + prev];
-  if(EVO[bk] && evoOk(bk, r)) return ARCH["evo_" + bk];
-  return b;
-}
+// การ์ดตัดสินจากคะแนนล่าสุดทุกครั้ง (ไม่มีร่างวิวัฒนาการ)
+function archetype(r){ return baseArch(r); }
 function archKey(ar){ return Object.keys(ARCH).find(k => ARCH[k] === ar) || "zero"; }
 function cardSVG(k, r, ar, nm){
   const C = CARD[k] || CARD.zero, F = "'IBM Plex Sans Thai','Thonburi','Leelawadee UI',sans-serif";
@@ -1443,25 +1437,32 @@ function skippedTests(){
 function silSVG(art, acc){
   return `<svg viewBox="0 0 170 165" width="100%"><defs><filter id="sil" x="-20%" y="-20%" width="140%" height="140%"><feFlood flood-color="#020403"/><feComposite in2="SourceAlpha" operator="in" result="s"/><feMorphology in="SourceAlpha" operator="dilate" radius="1.6" result="d"/><feFlood flood-color="${acc}"/><feComposite in2="d" operator="in" result="e"/><feGaussianBlur in="e" stdDeviation="2.5" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="e"/><feMergeNode in="s"/></feMerge></filter></defs><g filter="url(#sil)">${art}</g></svg>`;
 }
+// การ์ดเป้าหมายถัดไป (เงา) ตามจุดที่ต้องพัฒนา
+const NEXT = {strength:"core", rabbit:"core", noodle:"core", kangaroo:"core",
+  cardio:"cheetah", tank:"cheetah",
+  flex:"top", safe:"top", turtle:"top", life:"top", owl:"top", volcano:"top", body:"top", zero:"top",
+  top:"legend", core:"legend", cheetah:"legend", legend:"legend"};
 function nextSection(r, ar){
-  const k = archKey(ar), sp = speciesOf(k), evolved = k !== sp;
+  const k = archKey(ar), nk = NEXT[k] || "top", C = CARD[nk], A = ARCH[nk];
   const row = x => `<li class="${x[0] ? "ok" : ""}"><span>${x[0] ? "✓" : "○"}</span><span>${x[1]}<small>${x[2]}</small></span></li>`;
-  if(k === "evo_legend") return `<section class="card nextsec"><div class="nx-k">ร่างสูงสุดของทั้งเกม</div><h2>คุณคือ${ar.t}</h2>
-    <p class="sub">ไม่มีร่างไหนเหนือกว่านี้แล้ว รักษาร่างนี้ไว้ด้วยโปรแกรมด้านล่าง แล้วกลับมาทดสอบทุก 8 สัปดาห์</p>
-    <button class="btn btn-primary" id="toplan" type="button" style="width:100%;margin-top:12px">ดูโปรแกรมรักษาร่าง ↓</button></section>`;
-  // ยังไม่วิวัฒนาการ: เงาร่างวิวัฒนาการของตัวเอง / วิวัฒนาการแล้ว: เป้าหมายต่อไปคือมังกรตำนาน
-  const tk = evolved ? "legend" : sp, C = CARD[tk], art = evolved ? CARD.legend.m : CARD["evo_" + sp].m;
-  const rows = evolved ? r.dom.map(d => qd(r, d.k, 85)) : EVO[sp].req(r);
-  const head = evolved ? `<div class="nx-k">วิวัฒนาการแล้ว · เป้าหมายต่อไป</div><h2>ออกกำลังกายตามโปรแกรมด้านล่าง<br>เพื่อไปสู่ร่างตำนาน</h2>`
-    : `<div class="nx-k">ร่างวิวัฒนาการของ${ARCH[sp].t}</div><h2>ออกกำลังกายตามโปรแกรมด้านล่าง<br>เพื่อพัฒนาไปร่างต่อไป</h2>`;
-  return `<section class="card nextsec">${head}
+  if(k === "legend") return `<section class="card nextsec"><div class="nx-k">การ์ดสูงสุดแล้ว</div><h2>คุณคือ${A.t}</h2>
+    <p class="sub">ทุกด้าน 85 ขึ้นไป รักษาไว้ด้วยโปรแกรมด้านล่าง แล้วกลับมาทดสอบทุก 8 สัปดาห์</p>
+    <button class="btn btn-primary" id="toplan" type="button" style="width:100%;margin-top:12px">ดูโปรแกรมของคุณ ↓</button></section>`;
+  let rows;
+  if(nk === "core") rows = [qPlank(180)];
+  else if(nk === "cheetah") rows = [qRhr(60), qd(r, "cardio", 70)];
+  else rows = r.dom.map(d => qd(r, d.k, nk === "legend" ? 85 : 75));
+  const label = C.tier ? C.tier : C.rare ? "RARE" : "";
+  return `<section class="card nextsec">
+    <div class="nx-k">การ์ดต่อไปของคุณ</div>
+    <h2>ออกกำลังกายตามโปรแกรมด้านล่าง<br>เพื่อพัฒนาไปร่างต่อไป</h2>
     <div class="nx-row">
       <div class="nx-from"><svg viewBox="0 0 170 165" width="100%">${CARD[k].m}</svg><small>${ar.t}</small></div>
       <div class="nx-arrow">➜</div>
-      <div class="nx-to" style="--glow:${C.acc}">${silSVG(art, C.acc)}<small>??? <b>${evolved ? "LEGENDARY" : "EVOLVED"}</b></small></div>
+      <div class="nx-to" style="--glow:${C.acc}">${silSVG(C.m, C.acc)}<small>??? ${label ? `<b>${label}</b>` : ""}</small></div>
     </div>
-    <div class="nx-need"><b>${evolved ? "ปลดล็อกเมื่อ" : "วิวัฒนาการเมื่อ"}</b><ul>${rows.map(row).join("")}</ul></div>
-    <p class="meta" style="margin-top:8px">ทำตามโปรแกรม 6–8 สัปดาห์ แล้วกลับมาทดสอบใหม่ในเครื่องเดิม กด “แก้คำตอบ” ใส่ผลใหม่ ถ้าผ่านครบ การ์ดจะ${evolved ? "กลายเป็นร่างตำนาน" : "วิวัฒนาการ"}</p>
+    <div class="nx-need"><b>ได้การ์ดนี้เมื่อ</b><ul>${rows.map(row).join("")}</ul></div>
+    <p class="meta" style="margin-top:8px">ทำตามโปรแกรม 6–8 สัปดาห์ แล้วกลับมาทดสอบใหม่ การ์ดจะเปลี่ยนตามคะแนนล่าสุดของคุณ</p>
     <button class="btn btn-primary" id="toplan" type="button" style="width:100%;margin-top:12px">ไปที่โปรแกรมของคุณ ↓</button>
   </section>`;
 }
@@ -2140,7 +2141,7 @@ function fixState(){
   const p = S.a.pain; if(p != null && !Array.isArray(p)) S.a.pain = [String(p)];
   if(S.a.goal && !["fat","muscle","health","pain","sport"].includes(S.a.goal)) delete S.a.goal;
   if(!(S.step >= 0 && S.step < STEPS.length)) S.step = 0;
-  if(S.species && !EVO[S.species]) delete S.species;
+  delete S.species;
   const sk = S.skipped, emp = k => S.a[k] === undefined || S.a[k] === "";
   if(sk.push && !sk.pushStyle && emp("push")) sk.pushStyle = true;
   if(sk.pushStyle && !sk.push && emp("pushStyle")) sk.push = true;
